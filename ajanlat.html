@@ -110,7 +110,9 @@
     var moTag = ' <span style="display:inline-block;margin-left:4px;font-size:10px;font-weight:700;color:var(--blue);background:#eaf2fb;border-radius:4px;padding:1px 6px;vertical-align:middle">havi</span>';
     var rows = items.map(function(it){
       var q = Number(it.q)||0, p = Number(it.p)||0, mo = it.r ? ' / hó' : '';
-      return '<tr><td>'+esc(it.d)+(it.r?moTag:'')+'</td><td class="c">'+q+'</td><td class="r">'+ft(p)+mo+'</td><td class="r" style="font-weight:600">'+ft(q*p)+mo+'</td></tr>';
+      var qtyCell = it.r ? (q + ' hó') : q;
+      var amount = it.r ? ft(p) + mo : ft(q*p);
+      return '<tr><td>'+esc(it.d)+(it.r?moTag:'')+'</td><td class="c">'+qtyCell+'</td><td class="r">'+ft(p)+mo+'</td><td class="r" style="font-weight:600">'+amount+'</td></tr>';
     }).join('');
 
     var vatRate = Number(o.vatRate)||0;

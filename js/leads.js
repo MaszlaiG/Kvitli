@@ -726,7 +726,8 @@ function offerRecalc() {
   const vatRate = si.vatRate == null ? 27 : si.vatRate;
   const rows = _offerRows();
   const net = rows.filter((it) => !it.recurring).reduce((s, it) => s + it.qty * it.price, 0);
-  const netMo = rows.filter((it) => it.recurring).reduce((s, it) => s + it.qty * it.price, 0);
+  // Havi tételnél a mennyiség = hány hónapig fut, ezért a /hó összeg csak az egységár (nem szorozzuk a hónapszámmal)
+  const netMo = rows.filter((it) => it.recurring).reduce((s, it) => s + it.price, 0);
   const vat = vatReg ? (net * vatRate) / 100 : 0;
   const vatMo = vatReg ? (netMo * vatRate) / 100 : 0;
   const gross = net + vat;
@@ -843,7 +844,7 @@ function _offerDetailsHtml(items, t, validUntil) {
         ';font-size:13px;color:' +
         V +
         ';text-align:center;white-space:nowrap">' +
-        it.qty +
+        (it.recurring ? it.qty + ' hó' : it.qty) +
         '</td>' +
         '<td style="padding:11px 10px;border-bottom:1px solid ' +
         B +
@@ -858,7 +859,7 @@ function _offerDetailsHtml(items, t, validUntil) {
         ';font-size:13px;font-weight:600;color:' +
         V +
         ';text-align:right;white-space:nowrap">' +
-        _offerFt(it.qty * it.price) +
+        _offerFt(it.recurring ? it.price : it.qty * it.price) +
         (it.recurring ? ' / hó' : '') +
         '</td>' +
         '</tr>'

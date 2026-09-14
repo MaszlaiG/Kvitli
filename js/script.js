@@ -913,6 +913,82 @@ function nextInvoiceNumForOrder(order) {
   // A számla sorszáma megegyezik a megrendelés azonosítójával (pl. kvitli/2026/001)
   return order && order.num ? order.num : 'kvitli/' + now().slice(0, 4) + '/000';
 }
+// Hány havi évforduló telt el a kezdő dátum óta (a nap figyelembevételével)
+function _monthAnnivCount(startISO) {
+  const s = new Date(startISO);
+  if (isNaN(s.getTime())) return 0;
+  const t = new Date(now());
+  let months = (t.getFullYear() - s.getFullYear()) * 12 + (t.getMonth() - s.getMonth());
+  if (t.getDate() < s.getDate()) months -= 1;
+  return Math.max(0, months);
+}
+// A havidíj futásideje = a leghosszabb havi tétel hónapszáma
+function recurringTerm(o) {
+  if (!o || !o.recurring || !Array.isArray(o.recurring.items) || !o.recurring.items.length) return 0;
+  return o.recurring.items.reduce((m, it) => Math.max(m, it.months || 1), 0);
+}
+// Hány havidíj-számla esedékes még (nincs kiállítva) ehhez a projekthez — a futásidőig
+function recurringDue(o) {
+  const term = recurringTerm(o);
+  if (!term) return 0;
+  // 1. hónapot az első számla fedi; összesen `term` havi számla lehet
+  const shouldExist = Math.min(term, 1 + _monthAnnivCount(o.recurring.startDate));
+  return Math.max(0, shouldExist - (o.recurring.monthsBilled || 1));
+}
+function invIssueRecurring(orderId) {
+  const o = (state.orders || []).find((x) => x.id === orderId);
+  if (!o || !o.recurring || recurringDue(o) < 1) return;
+  const monthNo = (o.recurring.monthsBilled || 1) + 1;
+  const s = new Date(o.recurring.startDate);
+  const d = new Date(s.getFullYear(), s.getMonth() + (monthNo - 1), 1);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(s.getDate(), lastDay));
+  const issueDate = d.toISOString().slice(0, 10);
+  const dueD = new Date(d);
+  dueD.setDate(dueD.getDate() + 8);
+  const ym = issueDate.slice(0, 7);
+  const si = state.sellerInfo || {};
+  const invCurrency = o.currency === 'EUR' ? 'EUR' : 'HUF';
+  const inv = {
+    id: uid(),
+    orderId: o.id,
+    invoiceNum: o.num + '/' + String(monthNo).padStart(2, '0'),
+    issueDate,
+    dueDate: dueD.toISOString().slice(0, 10),
+    sellerName: si.name || '',
+    sellerAddress: si.address || '',
+    sellerTax: si.tax || '',
+    sellerReg: si.reg || '',
+    sellerBank: si.bank || '',
+    sellerEmail: si.email || '',
+    sellerPhone: si.phone || '',
+    buyerName: o.recurring.buyerName || o.name || '',
+    buyerAddress: o.recurring.buyerAddress || '',
+    buyerTax: o.recurring.buyerTax || '',
+    items: o.recurring.items
+      .filter((it) => (it.months || 1) >= monthNo)
+      .map((it) => ({
+        desc: it.desc + ' – havidíj (' + ym + ', ' + monthNo + '/' + (it.months || 1) + '. hó)',
+        qty: 1,
+        unit: 'hó',
+        unitPrice: it.unitPrice || 0
+      })),
+    currency: invCurrency,
+    fxRate: invCurrency === 'EUR' ? Number(o.fxRate) || eurHufRate() : 0,
+    vatRegistered: !!si.vatRegistered,
+    vatRate: si.vatRate == null ? 27 : si.vatRate,
+    note: '',
+    paid: false,
+    paidDate: '',
+    recurringMonth: monthNo
+  };
+  if (!state.invoices) state.invoices = [];
+  state.invoices.push(inv);
+  o.recurring.monthsBilled = monthNo;
+  save();
+  renderInvoices();
+  uiAlert('Havidíj-számla kiállítva: ' + inv.invoiceNum + ' (' + ym + ')', { title: 'Havi számla' });
+}
 const FX_FALLBACK_EUR_HUF = 400;
 function eurHufRate() {
   return state.fxEurHuf && state.fxEurHuf > 0 ? state.fxEurHuf : FX_FALLBACK_EUR_HUF;
@@ -3361,6 +3437,31 @@ function invNextNum() {
   const next = nums.length ? Math.max(...nums) + 1 : 1;
   return y + '-' + String(next).padStart(3, '0');
 }
+var _invItems = [];
+function invRenderItems() {
+  const box = document.getElementById('inv-items-list');
+  if (!box) return;
+  if (!_invItems.length) {
+    box.innerHTML = '';
+    return;
+  }
+  box.innerHTML = _invItems
+    .map(
+      (it) =>
+        '<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--surface2)">' +
+        '<div style="font-size:13px">' +
+        escHtml(it.desc) +
+        '<span style="color:var(--muted);font-size:11.5px"> · ' +
+        it.qty +
+        ' ' +
+        escHtml(it.unit || 'db') +
+        '</span></div>' +
+        '<div style="font-weight:600;white-space:nowrap">' +
+        Math.round((it.qty || 1) * (it.unitPrice || 0)).toLocaleString('hu-HU', { useGrouping: true }) +
+        ' Ft</div></div>'
+    )
+    .join('');
+}
 function invOpen(orderId) {
   const o = state.orders.find((x) => x.id === orderId);
   if (!o) return;
@@ -3378,10 +3479,38 @@ function invOpen(orderId) {
   sv('inv-buyer-name', buyer);
   sv('inv-buyer-address', '');
   sv('inv-buyer-tax', '');
-  sv('inv-item-desc', (o.type || '') + (o.topic ? ' — ' + o.topic : ''));
-  sv('inv-item-qty', '1');
-  sv('inv-item-unit', 'db');
-  sv('inv-item-price', o.price || 0);
+  // Tételek az elfogadott árajánlatból (egyszeri + havi is — a havi az első számlán egyszeri tételként)
+  const lead = o.leadId && state.leads ? state.leads[o.leadId] : null;
+  _invItems = [];
+  if (lead && lead.offer && Array.isArray(lead.offer.items)) {
+    _invItems = lead.offer.items
+      .filter((it) => it.desc)
+      .map((it) => {
+        if (it.recurring) {
+          const months = it.qty || 1; // havi tételnél a mennyiség = hány hónapig fut
+          return {
+            desc: it.desc + ' (havidíj – 1. hó / ' + months + ')',
+            qty: 1,
+            unit: 'hó',
+            unitPrice: it.price || 0,
+            recurring: true,
+            months: months
+          };
+        }
+        return { desc: it.desc, qty: it.qty || 1, unit: 'db', unitPrice: it.price || 0, recurring: false };
+      });
+  }
+  const manualBox = document.getElementById('inv-manual-item');
+  if (_invItems.length) {
+    if (manualBox) manualBox.style.display = 'none';
+  } else {
+    if (manualBox) manualBox.style.display = '';
+    sv('inv-item-desc', (o.type || '') + (o.topic ? ' — ' + o.topic : ''));
+    sv('inv-item-qty', '1');
+    sv('inv-item-unit', 'db');
+    sv('inv-item-price', o.price || 0);
+  }
+  invRenderItems();
   const si = state.sellerInfo || {};
   sv('inv-seller-name', si.name || '');
   sv('inv-seller-address', si.address || '');
@@ -3391,15 +3520,20 @@ function invOpen(orderId) {
   openModal('invoice-modal');
 }
 function invUpdatePreview() {
-  const qty = parseFloat(document.getElementById('inv-item-qty')?.value) || 0;
-  const price =
-    parseFloat((document.getElementById('inv-item-price')?.value || '').replace(/\s/g, '')) || 0;
+  let total = 0;
+  if (_invItems && _invItems.length) {
+    total = _invItems.reduce((s, it) => s + (it.qty || 1) * (it.unitPrice || 0), 0);
+  } else {
+    const qty = parseFloat(document.getElementById('inv-item-qty')?.value) || 0;
+    const price =
+      parseFloat((document.getElementById('inv-item-price')?.value || '').replace(/\s/g, '')) || 0;
+    total = qty * price;
+  }
   const el = document.getElementById('inv-preview-total');
   if (el)
-    el.textContent =
-      qty && price
-        ? L('Végösszeg', 'Total') + ': ' + Math.round(qty * price).toLocaleString('hu-HU', { useGrouping: true }) + ' Ft'
-        : '';
+    el.textContent = total
+      ? L('Végösszeg', 'Total') + ': ' + Math.round(total).toLocaleString('hu-HU', { useGrouping: true }) + ' Ft'
+      : '';
 }
 function invSave() {
   const gv = (id) => (document.getElementById(id)?.value || '').trim();
@@ -3451,6 +3585,34 @@ function invSave() {
   const invCurrency = linkedOrder && linkedOrder.currency === 'EUR' ? 'EUR' : 'HUF';
   const invFxRate =
     invCurrency === 'EUR' ? Number(linkedOrder && linkedOrder.fxRate) || eurHufRate() : 0;
+  const invItems =
+    _invItems && _invItems.length
+      ? _invItems.map((it) => ({
+          desc: it.desc,
+          qty: it.qty || 1,
+          unit: it.unit || 'db',
+          unitPrice: it.unitPrice || 0
+        }))
+      : [{ desc: itemDesc, qty: itemQty, unit: itemUnit, unitPrice: itemPrice }];
+  // Havidíjas tételek: a projektre elmentjük a havi számlázási tervet (a havi tételekről szól)
+  if (linkedOrder && _invItems && _invItems.some((it) => it.recurring)) {
+    linkedOrder.recurring = {
+      items: _invItems
+        .filter((it) => it.recurring)
+        .map((it) => ({
+          desc: (it.desc || '').replace(/\s*\(havidíj.*?\)\s*$/, ''),
+          qty: 1,
+          unit: 'hó',
+          unitPrice: it.unitPrice || 0,
+          months: it.months || 1
+        })),
+      startDate: issueDate,
+      monthsBilled: 1,
+      buyerName: buyerName,
+      buyerAddress: buyerAddr,
+      buyerTax: buyerTax
+    };
+  }
   const inv = {
     id: uid(),
     orderId,
@@ -3467,14 +3629,7 @@ function invSave() {
     buyerName,
     buyerAddress: buyerAddr,
     buyerTax,
-    items: [
-      {
-        desc: itemDesc,
-        qty: itemQty,
-        unit: itemUnit,
-        unitPrice: itemPrice
-      }
-    ],
+    items: invItems,
     currency: invCurrency,
     fxRate: invFxRate,
     vatRegistered: state.sellerInfo.vatRegistered,
@@ -3542,25 +3697,40 @@ function renderInvoices() {
   se('inv-overdue-sum', fmt(sumOf(overdueInv)));
   const panel = document.getElementById('inv-projects-list');
   if (panel) {
+    const dueOrders = (state.orders || []).filter((o) => recurringDue(o) > 0);
+    const remindersHtml = dueOrders
+      .map((o) => {
+        const n = recurringDue(o);
+        const sum = o.recurring.items.reduce((s, it) => s + (it.qty || 1) * (it.unitPrice || 0), 0);
+        return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--surface3)">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(o.name)} <span class="badge badge-yellow" style="font-size:9.5px">havidíj esedékes</span></div>
+            <div style="font-size:11px;color:var(--muted)">${fmt(sum)} / hó · ${n} hónap esedékes</div>
+          </div>
+          <button class="btn btn-sm" onclick="invIssueRecurring('${o.id}')">+ Havidíj-számla</button>
+        </div>`;
+      })
+      .join('');
     const elesOrders = (state.orders || []).filter(
-      (o) => o.status === 'eles' && !allInv.some((i) => i.orderId === o.id)
+      (o) => o.status !== 'torolve' && !allInv.some((i) => i.orderId === o.id)
     );
-    if (!elesOrders.length) {
-      panel.innerHTML =
-        '<div style="color:var(--muted);font-size:12.5px">Nincs élesben lévő projekt.</div>';
-    } else {
-      panel.innerHTML = elesOrders
-        .map((o) => {
-          const invCount = allInv.filter((i) => i.orderId === o.id).length;
-          return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--surface3)">
+    const billableHtml = elesOrders
+      .map((o) => {
+        const invCount = allInv.filter((i) => i.orderId === o.id).length;
+        return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--surface3)">
           <div style="flex:1;min-width:0">
             <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(o.name)}</div>
             <div style="font-size:11px;color:var(--muted)">${fmt(orderPriceHuf(o))}${invCount ? ' · <span style="color:var(--accent)">' + invCount + ' számla</span>' : ''}</div>
           </div>
           <button class="btn btn-sm btn-secondary" onclick="invOpen('${o.id}')">+ Számla</button>
         </div>`;
-        })
-        .join('');
+      })
+      .join('');
+    if (!remindersHtml && !billableHtml) {
+      panel.innerHTML =
+        '<div style="color:var(--muted);font-size:12.5px">Nincs számlázható projekt.</div>';
+    } else {
+      panel.innerHTML = remindersHtml + billableHtml;
     }
   }
   const unpaidTbody = document.getElementById('invoices-unpaid-tbody');

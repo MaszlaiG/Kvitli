@@ -1063,9 +1063,10 @@
                     margin: 10px 0 10px;
                   "
                 >
-                  Tétel
+                  Tételek
                 </div>
-                <div class="form-grid fg2" style="margin-bottom: 6px">
+                <div id="inv-items-list" style="margin-bottom: 6px"></div>
+                <div id="inv-manual-item" class="form-grid fg2" style="margin-bottom: 6px">
                   <div style="grid-column: 1/-1">
                     <label>Megnevezés</label>
                     <input type="text" id="inv-item-desc" placeholder="pl. Weboldal fejlesztés" />
@@ -1167,6 +1168,10 @@
               </div>
               <div id="offer-items"></div>
               <button class="btn btn-secondary btn-sm" onclick="offerAddRow()" style="margin-top: 2px">+ Tétel</button>
+              <div style="font-size: 11px; color: var(--muted); margin-top: 6px">
+                Havi tételnél a <strong>mennyiség = hány hónapig fut</strong> (pl. 12 = 12 hónapon át havi díj). Az első
+                számlára az 1. hónap kerül, majd havonta ismétlődik a megadott hónapszámig.
+              </div>
 
               <div class="divider" style="margin: 16px 0"></div>
               <div class="form-grid fg2" style="margin-bottom: 12px">
