@@ -33,8 +33,7 @@ function initPortfolioInboxSync() {
         let changed = false;
         snap.forEach((docSnap) => {
           const entry = docSnap.data() || {};
-          // Ajánlat-elfogadás jelzés (a megrendelő az e-mailből / ajanlat.html-ből
-          // fogadta el) — nem új lead, hanem a meglévő megkeresés elfogadottá tétele.
+
           if (entry.accept === true) {
             const lead = entry.leadId && state.leads[entry.leadId];
             if (lead && lead.offer && lead.offer.sentAt && !lead.offer.accepted) {
@@ -49,7 +48,7 @@ function initPortfolioInboxSync() {
             docSnap.ref.delete().catch(() => {});
             return;
           }
-          // Szerződés-aláírás jelzés (a megrendelő a szerzodes.html-en írt alá).
+
           if (entry.contractSign === true) {
             const lead = entry.leadId && state.leads[entry.leadId];
             if (lead && lead.contract && !lead.contract.signed) {
@@ -57,13 +56,12 @@ function initPortfolioInboxSync() {
               lead.contract.signerName = entry.signerName || '';
               lead.contract.signedAt = entry.signedAt || new Date().toISOString();
               lead.status = 'megrendelve';
-              // Automatikus projektbe emelés (ha még nincs) — a Projektek közé kerül.
+
               if (!state.orders.find((o) => o.leadId === lead.id)) {
                 state.orders.push(_leadToOrder(lead));
               }
               changed = true;
-              // A végleges aláírt példányt (kézjegy-képpel) a contracts dokumentumba
-              // írjuk vissza, hogy a vault kicsi maradjon.
+
               if (entry.contractId) {
                 try {
                   firebase
@@ -288,7 +286,7 @@ function setLeadDeadline(id, deadline) {
   lead.deadline = deadline;
   save();
 }
-// Megkeresésből projekt (order) objektum — mellékhatás nélkül, csak visszaadja.
+
 function _leadToOrder(lead) {
   const order = {
     id: 'ord_' + Date.now().toString(36),
@@ -382,7 +380,7 @@ function renderLeadsTable() {
       const _fmtSec = (iso) => escHtml((iso || '').replace('T', ' ').slice(0, 19));
       const offerAccepted = !!(lead.offer && lead.offer.accepted);
       const contractSigned = !!(lead.contract && lead.contract.signed);
-      // Ajánlat-gomb csak addig, amíg NINCS elfogadva; utána zöld, másodpercre pontos info + megnézés.
+
       const offerBtn = offerAccepted
         ? ''
         : `<button class="btn btn-secondary btn-sm" onclick="openOfferModal('${lead.id}')" title="Árajánlat összeállítása és küldése"
@@ -393,7 +391,7 @@ function renderLeadsTable() {
         ? `<div style="font-size:9.5px;color:var(--accent2);margin-top:4px;white-space:nowrap">✓ Ajánlat elküldve: ${escHtml((lead.offer.sentAt || '').slice(0, 10))}</div>`
         : '';
       const contractReady = canSendContract(lead);
-      // Szerződés-gomb csak addig, amíg NINCS aláírva.
+
       const contractBtn = contractSigned
         ? ''
         : contractReady
@@ -761,8 +759,7 @@ async function sendOffer() {
   const bizName = si.name || 'Kvitli';
   const ownerMail = si.email || (LocalStore.currentUser && LocalStore.currentUser.email) || '';
   const details = _offerDetailsHtml(items, t, validUntil);
-  // Letölthető PDF-nézet linkje: az ajánlat adata base64url-ként a link # részében
-  // utazik → nincs backend/Firestore, a megrendelő az ajanlat.html oldalon menti PDF-be.
+
   let pdfUrl = '';
   try {
     const offerPayload = {
@@ -792,11 +789,9 @@ async function sendOffer() {
   } catch (e) {
     pdfUrl = '';
   }
-  // Az "Elfogadom" gomb ugyanezt az oldalt nyitja, de elfogadás-szándékkal (a=1):
-  // ott egy explicit kattintással írja be a megrendelő az elfogadást a Firestore-ba.
+
   const acceptUrl = pdfUrl ? pdfUrl + '&a=1' : '';
-  // A gombokat a KÓD építi kész HTML-ként (a sablon {{{actions}}}-ként szúrja be) —
-  // az EmailJS alapmotorja nem tudja a {{#if}} blokkokat, ezért itt oldjuk meg.
+
   const qMail =
     'mailto:' + ownerMail + '?subject=K%C3%A9rd%C3%A9sem%20van%20az%20%C3%A1raj%C3%A1nlatr%C3%B3l';
   const acceptHref =

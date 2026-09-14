@@ -98,7 +98,6 @@
 
   var REF=null, DOC=null, PAD=null, DONE=false;
 
-  // Egyszerű aláírás-pad (egér + érintés)
   function makePad(canvas){
     var ctx=canvas.getContext('2d');
     var rect=canvas.getBoundingClientRect(), ratio=window.devicePixelRatio||1;
@@ -176,10 +175,10 @@
   function showSigned(name, iso, png){
     var sw=document.getElementById('signwrap'); if(sw) sw.remove();
     var when=(iso||'').replace('T',' ').slice(0,16);
-    // Az aláírás a szerződésben a Megrendelő aláírásvonala FÖLÉ kerül (a slotba).
+
     var slot=document.querySelector('.rendli-sig-client');
     if(slot) slot.innerHTML='<img src="'+png+'" alt="aláírás" style="max-height:58px;max-width:92%">';
-    // Audit-sor a Kelt alá.
+
     var stamp=document.querySelector('.rendli-sign-stamp');
     if(stamp) stamp.innerHTML='<p style="margin-top:8px;font-size:11px;color:#777">Elektronikusan aláírta: <strong>'+esc(name)+'</strong> · '+esc(when)+'</p>';
     document.getElementById('signed-slot').innerHTML =
@@ -189,7 +188,6 @@
       '</div><p class="sign-sub" style="margin-top:12px">Az aláírásod bekerült a szerződésbe (a Megrendelő vonala fölé). A „Mentés PDF-ként" gombbal elmentheted magadnak az aláírt szerződést.</p></div>';
   }
 
-  // Betöltés: a szerződés lekérése a Firestore-ból (publikus olvasás a tokennel)
   REF = parseRef();
   if(!REF){ showErr('Ez a szerződés-link érvénytelen.<br>Kérlek, nyisd meg a kapott e-mailből a teljes linket.'); }
   else {

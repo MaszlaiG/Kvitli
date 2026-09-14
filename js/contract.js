@@ -245,7 +245,6 @@ function _closingBody() {
   );
 }
 
-// Város kinyerése a címből ("1052 Budapest, Példa u. 1." → "Budapest").
 function _cityOf(addr) {
   addr = (addr || '').trim();
   const m = addr.match(/\d{4}\s+([^,]+)/);
@@ -257,7 +256,7 @@ function _signaturesBlock(ctx, roles) {
   const hely = _cityOf(ctx.m.cim) || '[hely]';
   return (
     '<div style="display:flex;justify-content:space-between;gap:40px;margin-top:44px">' +
-    // BAL oldal: Vállalkozó (tulaj) — nincs rárajzolt kézjegy, csak térköz az igazításhoz
+
     '<div style="flex:1;text-align:center">' +
     '<div style="height:64px"></div>' +
     '<div style="border-top:1px solid #333;padding-top:6px;font-size:12px">' +
@@ -265,7 +264,7 @@ function _signaturesBlock(ctx, roles) {
     '<br><strong>' +
     escHtml(ctx.m.nev) +
     '</strong></div></div>' +
-    // JOBB oldal: Megrendelő (ügyfél) — ide kerül a rárajzolt aláírás a vonal fölé
+
     '<div style="flex:1;text-align:center">' +
     '<div class="rendli-sig-client" style="height:64px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden"></div>' +
     '<div style="border-top:1px solid #333;padding-top:6px;font-size:12px">' +
@@ -1238,13 +1237,13 @@ function viewSignedContract(leadId) {
       const when = (d.signedAt || lead.contract.signedAt || '').replace('T', ' ').slice(0, 16);
       let html = d.html || '';
       if (d.signaturePng) {
-        // Az aláírás-képet a Megrendelő aláírásvonala FÖLÉ tesszük (a slot-ba).
+
         const img =
           '<img src="' + d.signaturePng + '" alt="aláírás" style="max-height:58px;max-width:92%">';
         const slot = '<div class="rendli-sig-client" style="height:64px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden">';
         if (html.indexOf(slot) >= 0) html = html.replace(slot, slot + img);
         else html += '<div style="margin-top:24px;text-align:center"><div style="border-top:1px solid #333;display:inline-block;padding-top:6px">' + img + '</div></div>';
-        // Szöveges audit-sor a Kelt alá (a stamp-helyre); ha nincs, a lap aljára.
+
         const stamp =
           '<p style="margin-top:8px;font-size:11px;color:#777">Elektronikusan aláírta: <strong>' +
           escHtml(d.signerName || lead.contract.signerName || '') +
@@ -1326,8 +1325,7 @@ async function sendContract() {
   const btn = document.getElementById('contract-send-btn');
   if (btn) btn.disabled = true;
   setNote('Küldés folyamatban…', false);
-  // A szerződést a Firestore-ba tesszük (véletlen tokennel), hogy a megrendelő az
-  // e-mail linkjéről megnyithassa és ALÁÍRHASSA a szerzodes.html oldalon.
+
   const contractId =
     'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   let signUrl = '';
@@ -1353,8 +1351,7 @@ async function sendContract() {
     console.warn('[Kvitli] szerződés közzététel:', e);
     signUrl = '';
   }
-  // A gombot a KÓD építi kész HTML-ként (a sablon {{{sign_button}}}-ként szúrja be) —
-  // az EmailJS alapmotorja nem tudja a {{#if}} blokkokat.
+
   const signHref =
     signUrl ||
     'mailto:' + ownerMail + '?subject=Elfogadom%20a%20megb%C3%ADz%C3%A1si%20szerz%C5%91d%C3%A9st';

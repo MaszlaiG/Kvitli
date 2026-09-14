@@ -18,7 +18,7 @@
 
 **Tech:** vanilla HTML/CSS/JS · Firebase (Auth + Firestore) · EmailJS · custom canvas charts.
 
-**Structure:** `index.html`, `ajanlat.html`, `szerzodes.html` · `css/` · `js/` · `e-mail sablonok/` · `firebase/` · `dokumentumok/`.
+**Structure:** `index.html`, `ajanlat.html`, `szerzodes.html` · `css/` · `js/` · `img/` · `email-sablonok/` · `firebase/` · `dokumentumok/`.
 Setup notes: `dokumentumok/BEALLITAS-Firebase.txt`, `dokumentumok/BEALLITAS-EmailJS.txt`. Full documentation: the **tervdokumentáció PDF** in `dokumentumok/`.
 
 ---
@@ -34,5 +34,5 @@ A **Kvitli** fiók-alapú **vállalkozáskezelő** webapp szabadúszóknak és k
 
 **Technológia:** vanilla HTML/CSS/JS · Firebase (Auth + Firestore) · EmailJS · egyedi canvas diagramok.
 
-**Szerkezet:** `index.html`, `ajanlat.html`, `szerzodes.html` · `css/` · `js/` · `e-mail sablonok/` · `firebase/` · `dokumentumok/`.
+**Szerkezet:** `index.html`, `ajanlat.html`, `szerzodes.html` · `css/` · `js/` · `img/` · `email-sablonok/` · `firebase/` · `dokumentumok/`.
 Beállítási jegyzetek: `dokumentumok/BEALLITAS-Firebase.txt`, `dokumentumok/BEALLITAS-EmailJS.txt`. Teljes leírás: a **tervdokumentáció PDF** a `dokumentumok/` mappában.

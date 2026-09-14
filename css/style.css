@@ -398,15 +398,6 @@ body.sidebar-collapsed #main-nav button.active {
   display: block;
 }
 
-.rendli-mark .bs0 {
-  stop-color: var(--brand-1);
-}
-.rendli-mark .bs1 {
-  stop-color: var(--brand-2);
-}
-.rendli-mark .bar-accent {
-  fill: var(--brand-accent);
-}
 .brand-word {
   font-family: var(--display);
   font-size: 20px;
@@ -1658,7 +1649,6 @@ html[data-mode="dark"] .mode-seg button.active {
   }
 }
 
-/* ===== Kvitli belépő intró ===== */
 .kv-intro {
   position: fixed;
   inset: 0;

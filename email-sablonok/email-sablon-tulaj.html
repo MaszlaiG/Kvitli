@@ -1,12 +1,4 @@
-<!--
-  RENDLI — ÜGYFÉL-VISSZAIGAZOLÓ E-MAIL (templateCustomer)
-  EmailJS template Content (Code / HTML). Settings fülön:
-    To Email = {{to_email}} · From Name = {{from_name}} · Reply To = {{reply_to}} · Subject = {{subject}}
-  A kód tölti a változókat: brand_initial, from_name, tagline, heading, intro,
-  {{{actions}}} (nyers HTML Hívás/Válasz gombok a vállalkozás elérhetőségeivel —
-  üresnél nem jelenik meg), {{{details}}} (nyers HTML-tábla, HÁROM kapcsos!), footer_note.
-  Akcentus: Kvitli kék (#2378be) + zöld visszaigazolás (#37b24d).
--->
+
 <div style="margin: 0; padding: 0; background: #eef1f8">
   <table
     role="presentation"
@@ -35,53 +27,76 @@
             overflow: hidden;
           "
         >
-          <!-- Zöld visszaigazolás-akcentus (recipiens-megkülönböztető) -->
+
           <tr>
-            <td style="height: 4px; line-height: 4px; font-size: 0; background: #37b24d">&nbsp;</td>
+            <td style="height: 4px; line-height: 4px; font-size: 0; background: #f76707">&nbsp;</td>
           </tr>
 
           <tr>
             <td style="padding: 24px 34px 20px 34px; border-bottom: 1px solid #e4eaf5">
-              <table role="presentation" cellpadding="0" cellspacing="0">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align: middle">
                     <table role="presentation" cellpadding="0" cellspacing="0">
                       <tr>
-                        <td
-                          style="
-                            width: 44px;
-                            height: 44px;
-                            background: #2378be;
-                            border-radius: 10px;
-                            color: #ffffff;
-                            font-size: 20px;
-                            font-weight: 800;
-                            text-align: center;
-                            line-height: 44px;
-                            font-family: -apple-system, &quot;Segoe UI&quot;, Arial, sans-serif;
-                          "
-                        >
-                          {{brand_initial}}
+                        <td style="vertical-align: middle">
+                          <table role="presentation" cellpadding="0" cellspacing="0">
+                            <tr>
+                              <td
+                                style="
+                                  width: 44px;
+                                  height: 44px;
+                                  background: #2378be;
+                                  border-radius: 10px;
+                                  color: #ffffff;
+                                  font-size: 20px;
+                                  font-weight: 800;
+                                  text-align: center;
+                                  line-height: 44px;
+                                  font-family: -apple-system, &quot;Segoe UI&quot;, Arial, sans-serif;
+                                "
+                              >
+                                {{brand_initial}}
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                        <td style="vertical-align: middle; padding-left: 13px">
+                          <div style="font-size: 17px; font-weight: 800; color: #171c28; letter-spacing: -0.02em">
+                            {{from_name}}
+                          </div>
+                          <div
+                            style="
+                              font-size: 11.5px;
+                              font-weight: 600;
+                              color: #2378be;
+                              letter-spacing: 0.04em;
+                              text-transform: uppercase;
+                              margin-top: 2px;
+                            "
+                          >
+                            {{tagline}}
+                          </div>
                         </td>
                       </tr>
                     </table>
                   </td>
-                  <td style="vertical-align: middle; padding-left: 13px">
-                    <div style="font-size: 17px; font-weight: 800; color: #171c28; letter-spacing: -0.02em">
-                      {{from_name}}
-                    </div>
-                    <div
+                  <td style="vertical-align: middle; text-align: right">
+                    <span
                       style="
-                        font-size: 11.5px;
-                        font-weight: 600;
-                        color: #2378be;
-                        letter-spacing: 0.04em;
+                        display: inline-block;
+                        background: #fff0e6;
+                        color: #d9480f;
+                        font-size: 11px;
+                        font-weight: 700;
+                        letter-spacing: 0.03em;
                         text-transform: uppercase;
-                        margin-top: 2px;
+                        padding: 6px 12px;
+                        border-radius: 999px;
                       "
                     >
-                      {{tagline}}
-                    </div>
+                      &#9679; Új megrendelés
+                    </span>
                   </td>
                 </tr>
               </table>
@@ -90,26 +105,6 @@
 
           <tr>
             <td style="padding: 28px 34px 8px 34px">
-              <!-- Zöld pipa-jelvény: vizuális visszaigazolás -->
-              <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 0 16px 0">
-                <tr>
-                  <td
-                    style="
-                      width: 40px;
-                      height: 40px;
-                      background: #eafaef;
-                      border-radius: 999px;
-                      color: #2b8a3e;
-                      font-size: 22px;
-                      font-weight: 800;
-                      text-align: center;
-                      line-height: 40px;
-                    "
-                  >
-                    &#10003;
-                  </td>
-                </tr>
-              </table>
               <h1
                 style="
                   margin: 0 0 12px 0;
@@ -139,12 +134,12 @@
             <td style="padding: 26px 34px 30px 34px">
               <div
                 style="
-                  background: #eef1f8;
-                  border-left: 3px solid #2378be;
+                  background: #fff7ed;
+                  border-left: 3px solid #f76707;
                   border-radius: 0 8px 8px 0;
                   padding: 12px 15px;
                   font-size: 12.5px;
-                  color: #2b3550;
+                  color: #7a3d0b;
                   line-height: 1.6;
                 "
               >
