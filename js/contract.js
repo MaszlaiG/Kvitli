@@ -254,11 +254,18 @@ function _cityOf(addr) {
 }
 function _signaturesBlock(ctx, roles) {
   const hely = _cityOf(ctx.m.cim) || '[hely]';
+  const si = (typeof state !== 'undefined' && state.sellerInfo) || {};
+  const providerSig = si.signaturePng
+    ? '<div style="height:64px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden"><img src="' +
+      si.signaturePng +
+      '" alt="aláírás" style="max-height:60px;max-width:92%"></div>'
+    : '<div style="height:64px"></div>';
   return (
-    '<div style="display:flex;justify-content:space-between;gap:40px;margin-top:44px">' +
+    '<div style="page-break-inside:avoid;break-inside:avoid;margin-top:44px">' +
+    '<div style="display:flex;justify-content:space-between;gap:40px">' +
 
     '<div style="flex:1;text-align:center">' +
-    '<div style="height:64px"></div>' +
+    providerSig +
     '<div style="border-top:1px solid #333;padding-top:6px;font-size:12px">' +
     roles.provider +
     '<br><strong>' +
@@ -278,7 +285,8 @@ function _signaturesBlock(ctx, roles) {
     ', ' +
     escHtml(ctx.kelt) +
     '.</p>' +
-    '<div class="rendli-sign-stamp"></div>'
+    '<div class="rendli-sign-stamp"></div>' +
+    '</div>'
   );
 }
 
@@ -1170,7 +1178,7 @@ function buildContractDoc(ctx, tplId) {
     '.print-btn{position:fixed;top:14px;right:14px;background:#2378be;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer}' +
     '.edit-hint{position:sticky;top:0;background:#eef1fb;border:1px solid #c9d4f5;color:#2c3e66;border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:12px}' +
     '#doc:focus{outline:none}' +
-    '@media print{.print-btn,.edit-hint{display:none}.c-disclaimer{border-color:#d9a441}}</style></head><body>' +
+    '@media print{@page{margin:0}body{padding:14mm;max-width:none}.print-btn,.edit-hint{display:none}.c-disclaimer{border-color:#d9a441}h1,h2,h3{page-break-after:avoid;break-after:avoid}table,tr{page-break-inside:avoid;break-inside:avoid}}</style></head><body>' +
     '<button class="print-btn" onclick="window.print()">Nyomtatás / Mentés PDF-ként</button>' +
     '<div class="edit-hint">✎ Ez a nézet <strong>szerkeszthető</strong>: kattints bárhová, és írd át a szöveget vagy a [ ] részeket, mielőtt nyomtatsz / PDF-be mentesz. (A módosítás csak ebben az ablakban él, a Kvitlibe nem mentődik vissza.)</div>' +
     '<div id="doc" contenteditable="true">' +
@@ -1220,7 +1228,7 @@ function viewSignedContract(leadId) {
       "<style>@page{margin:16mm}body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;color:#1a1a1a;max-width:820px;margin:0 auto;padding:28px 24px}h1,h2{color:#171c28}" +
       '.print-btn{position:fixed;top:14px;right:14px;background:#2378be;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer}' +
       '.sig{margin-top:28px;border-top:1px solid #e4eaf5;padding-top:16px}.sig img{max-height:120px;border:1px solid #e4eaf5;border-radius:8px;padding:6px;background:#fff}' +
-      '@media print{.print-btn{display:none}}</style></head><body>' +
+      '@media print{@page{margin:0}body{padding:14mm;max-width:none}.print-btn{display:none}h1,h2,h3{page-break-after:avoid;break-after:avoid}table,tr{page-break-inside:avoid;break-inside:avoid}}</style></head><body>' +
       '<button class="print-btn" onclick="window.print()">Nyomtatás / Mentés PDF-ként</button>' +
       '<div id="doc">Betöltés…</div></body></html>'
   );

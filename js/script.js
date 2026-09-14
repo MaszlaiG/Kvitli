@@ -1284,6 +1284,7 @@ window.populateAccountForms = function () {
   const vatRate = document.getElementById('seller-vatrate');
   if (vatRate) vatRate.value = si.vatRate == null ? 27 : si.vatRate;
   if (typeof onVatStatusChange === 'function') onVatStatusChange();
+  if (typeof initSellerSignPad === 'function') initSellerSignPad();
   const epEl = document.getElementById('inbox-endpoint');
   if (epEl) epEl.value = inboxTargetUid();
   const keyEl = document.getElementById('inbox-key');
@@ -1406,6 +1407,12 @@ function sendAccountPasswordReset() {
 }
 function saveSellerInfo() {
   const gv = (id) => (document.getElementById(id)?.value || '').trim();
+  const prevSign = (state.sellerInfo && state.sellerInfo.signaturePng) || '';
+  const signaturePng = _sellerSignPad
+    ? _sellerSignPad.isEmpty()
+      ? ''
+      : _sellerSignPad.png()
+    : prevSign;
   state.sellerInfo = {
     name: gv('seller-name'),
     address: gv('seller-address'),
@@ -1415,11 +1422,96 @@ function saveSellerInfo() {
     email: gv('seller-email'),
     phone: gv('seller-phone'),
     vatRegistered: gv('seller-vat') === 'afas',
-    vatRate: parseFloat((document.getElementById('seller-vatrate') || {}).value) || 0 || 27
+    vatRate: parseFloat((document.getElementById('seller-vatrate') || {}).value) || 0 || 27,
+    signaturePng: signaturePng
   };
   save();
   setAcctNote('acct-seller-note', 'Cégadatok mentve \u2713');
   setTimeout(() => setAcctNote('acct-seller-note', ''), 2500);
+}
+var _sellerSignPad = null;
+function initSellerSignPad() {
+  const canvas = document.getElementById('seller-sign-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const rect = canvas.getBoundingClientRect();
+  const ratio = window.devicePixelRatio || 1;
+  const w = Math.round(rect.width) || 420;
+  const h = 150;
+  canvas.width = Math.round(w * ratio);
+  canvas.height = Math.round(h * ratio);
+  ctx.scale(ratio, ratio);
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#171c28';
+  let drawing = false,
+    lastPt = null,
+    dirty = false;
+  const setPh = (show) => {
+    const ph = canvas.parentNode.querySelector('.seller-sign-ph');
+    if (ph) ph.style.display = show ? '' : 'none';
+  };
+  const pos = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const p = e.touches && e.touches[0] ? e.touches[0] : e;
+    return { x: p.clientX - r.left, y: p.clientY - r.top };
+  };
+  const start = (e) => {
+    e.preventDefault();
+    drawing = true;
+    lastPt = pos(e);
+    setPh(false);
+  };
+  const move = (e) => {
+    if (!drawing) return;
+    e.preventDefault();
+    const p = pos(e);
+    ctx.beginPath();
+    ctx.moveTo(lastPt.x, lastPt.y);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    lastPt = p;
+    dirty = true;
+  };
+  const end = () => {
+    drawing = false;
+  };
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start, { passive: false });
+  canvas.addEventListener('touchmove', move, { passive: false });
+  canvas.addEventListener('touchend', end);
+  _sellerSignPad = {
+    clear: function () {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      dirty = false;
+      setPh(true);
+    },
+    isEmpty: function () {
+      return !dirty;
+    },
+    png: function () {
+      return canvas.toDataURL('image/png');
+    },
+    load: function (dataUrl) {
+      const img = new Image();
+      img.onload = function () {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, w, h);
+        dirty = true;
+        setPh(false);
+      };
+      img.src = dataUrl;
+    }
+  };
+  const si = (state && state.sellerInfo) || {};
+  if (si.signaturePng) _sellerSignPad.load(si.signaturePng);
+  else _sellerSignPad.clear();
+}
+function clearSellerSign() {
+  if (_sellerSignPad) _sellerSignPad.clear();
 }
 function onVatStatusChange() {
   const sel = document.getElementById('seller-vat');
@@ -1496,8 +1588,8 @@ function inboxEmbedSnippet() {
   var mount = document.getElementById("rendli-order-mount");
   var CFG = {}, LANG = "hu";
   var T = {
-    hu: { name:"Név", email:"E-mail", company:"Cég neve", tax:"Adószám", priv:"Magánszemély", biz:"Vállalkozó", choose:"Válassz szolgáltatást…", service:"Munka típusa", phone:"Telefon", budget:"Tervezett keret", message:"Üzenet", submit:"Rendelés elküldése", thanks:"Köszönjük, a rendelést megkaptuk!", err:"Hiba történt a küldéskor, próbáld újra.", needCo:"Vállalkozóként a cég nevét kötelező megadni.", mo:"/ hó", moWord:"havi", moTag:"[Havidíjas szolgáltatás]" },
-    en: { name:"Name", email:"Email", company:"Company name", tax:"VAT number", priv:"Individual", biz:"Company", choose:"Choose a service…", service:"Type of work", phone:"Phone", budget:"Budget", message:"Message", submit:"Send order", thanks:"Thank you, we received your order!", err:"Something went wrong, please try again.", needCo:"Company name is required.", mo:"/ mo", moWord:"monthly", moTag:"[Monthly service]" }
+    hu: { name:"Név", email:"E-mail", company:"Cég neve", tax:"Adószám", priv:"Magánszemély", biz:"Vállalkozó", choose:"Válassz szolgáltatást…", service:"Munka típusa", phone:"Telefon", budget:"Tervezett keret", message:"Üzenet", submit:"Rendelés elküldése", thanks:"Köszönjük, a rendelést megkaptuk!", err:"Hiba történt a küldéskor, próbáld újra.", needCo:"Vállalkozóként a cég nevét kötelező megadni.", badEmail:"Az e-mail cím érvénytelennek tűnik (pl. hiányzó pont a domainben). Kérlek ellenőrizd, hogy oda küldjük a visszaigazolást.", mo:"/ hó", moWord:"havi", moTag:"[Havidíjas szolgáltatás]" },
+    en: { name:"Name", email:"Email", company:"Company name", tax:"VAT number", priv:"Individual", biz:"Company", choose:"Choose a service…", service:"Type of work", phone:"Phone", budget:"Budget", message:"Message", submit:"Send order", thanks:"Thank you, we received your order!", err:"Something went wrong, please try again.", needCo:"Company name is required.", badEmail:"The email address looks invalid (e.g. a missing dot in the domain). Please check it — we send the confirmation there.", mo:"/ mo", moWord:"monthly", moTag:"[Monthly service]" }
   };
   var EMAILJS = { publicKey: "${EMAILJS_CFG.publicKey}", serviceId: "${EMAILJS_CFG.serviceId}", templateCustomer: "${EMAILJS_CFG.templateCustomer}", templateOwner: "${EMAILJS_CFG.templateOwner}" };
   var M = {
@@ -1663,7 +1755,13 @@ function inboxEmbedSnippet() {
       var f = fc.fields || {};
       var typeSel = form.querySelector("[name=type]"), price = 0, per = "", locName = g("type");
       if (typeSel && typeSel.selectedOptions && typeSel.selectedOptions[0]) { price = Number(typeSel.selectedOptions[0].getAttribute("data-price")) || 0; per = typeSel.selectedOptions[0].getAttribute("data-period") || ""; locName = typeSel.selectedOptions[0].getAttribute("data-loc") || locName; }
-      var nameV = g("name") || "—", emailV = g("email");
+      var nameV = g("name") || "—", emailV = g("email").trim();
+      if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(emailV)) {
+        rendliNotify(t.badEmail);
+        var _em = form.querySelector("[name=email]");
+        if (_em) { try { _em.focus(); } catch (x) {} }
+        return;
+      }
       var phoneV = f.phone ? g("phone") : "", budgetV = f.budget ? g("budget") : "", deadlineV = f.deadline ? g("deadline") : "";
       var rawMsg = g("message"), ctV = "", coV = "", taxV = "";
       if (fc.business) {

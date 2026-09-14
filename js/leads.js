@@ -793,6 +793,15 @@ async function sendOffer() {
     setNote('Ehhez a megkereséshez nincs e-mail cím — nem küldhető ajánlat.', true);
     return;
   }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(lead.email).trim())) {
+    setNote(
+      'A megrendelő e-mail címe érvénytelennek tűnik: „' +
+        lead.email +
+        '" (pl. hiányzó pont). Ellenőrizd/javítsd a címet, mielőtt ajánlatot küldesz.',
+      true
+    );
+    return;
+  }
   if (!emailjsReady()) {
     setNote('Az EmailJS nincs beállítva (EMAILJS_CFG). Lásd: dokumentumok/BEALLITAS-EmailJS.txt', true);
     return;

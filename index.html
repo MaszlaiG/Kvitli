@@ -1578,6 +1578,28 @@
                   Ez határozza meg, hogyan jelenik meg az ÁFA a számlán: alanyi adómentesnél „AAM" (áfa nélkül),
                   ÁFA-körösnél nettó + ÁFA + bruttó bontásban. Az űrlapon megadott árakat nettóként kezeli.
                 </div>
+                <div style="margin-top: 18px; font-weight: 700; color: var(--ink)">Vállalkozói aláírás (a szerződésekre)</div>
+                <div class="account-sub" style="margin-top: 4px">
+                  Rajzold be egyszer az aláírásod — automatikusan rákerül minden generált szerződésre, így a
+                  megrendelő már a te aláírásoddal kapja meg. Bármikor újrarajzolható.
+                </div>
+                <div style="margin-top: 10px; max-width: 440px">
+                  <div
+                    id="seller-sign-pad"
+                    style="position: relative; background: #fff; border: 1px dashed #b9c4de; border-radius: 10px; touch-action: none"
+                  >
+                    <canvas id="seller-sign-canvas" style="display: block; width: 100%; height: 150px; border-radius: 10px"></canvas>
+                    <div
+                      class="seller-sign-ph"
+                      style="position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; color: #b3bccf; font-size: 12.5px; pointer-events: none"
+                    >
+                      ✍ Ide rajzold az aláírásod
+                    </div>
+                  </div>
+                  <div style="margin-top: 8px">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="clearSellerSign()">Aláírás törlése</button>
+                  </div>
+                </div>
                 <div style="margin-top: 12px">
                   <button class="btn btn-sm" onclick="saveSellerInfo()">Cégadatok mentése</button>
                   <span class="mode-note" id="acct-seller-note" style="margin-left: 10px"></span>

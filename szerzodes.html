@@ -67,11 +67,16 @@
     .legal { padding:0 18px; }
   }
   @media print {
+    /* margin:0 → a böngésző nem tesz URL/dátum/oldalszám fej-/láblécet; a margókat belső padding adja */
+    @page { margin:0; }
     body { background:#fff; }
     .bar, .toast, .no-print { display:none !important; }
-    .wrap { margin:0; max-width:none; padding:0; }
+    .wrap { margin:0; max-width:none; padding:14mm; }
     .sheet { border:none; border-radius:0; }
     .foot { display:none; }
+    .signwrap, .signed-box, .signed-box * { page-break-inside:avoid; break-inside:avoid; }
+    .contract h1, .contract h2, .contract h3 { page-break-after:avoid; break-after:avoid; }
+    .contract table, .contract tr { page-break-inside:avoid; break-inside:avoid; }
   }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
@@ -125,7 +130,6 @@
       '<div class="wrap"><div class="sheet">'+
         '<div class="head"><div class="avatar">'+esc(initial(d.bizName))+'</div>'+
           '<div><div class="biz">'+esc(d.bizName||'Szerződés')+'</div>'+(d.toName?'<div style="font-size:12.5px;color:#5d6b85;margin-top:3px">Címzett: <strong style="color:#171c28">'+esc(d.toName)+'</strong></div>':'')+'</div>'+
-          '<div class="tag">'+esc(d.docType||'Szerződés')+'</div>'+
         '</div>'+
         '<div class="contract">'+(d.html||'')+'</div>'+
         '<div class="signwrap no-print" id="signwrap">'+
