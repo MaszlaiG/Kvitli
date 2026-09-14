@@ -1228,58 +1228,16 @@ function viewSignedContract(leadId) {
     uiAlert('Ehhez a megkereséshez nincs elmentett aláírt szerződés.');
     return;
   }
-  const win = window.open('', '_blank', 'width=900,height=1160');
-  if (!win) {
-    uiAlert('A böngésző blokkolta a felugró ablakot. Engedélyezd az oldal számára.');
-    return;
-  }
-  win.document.write(
-    '<!DOCTYPE html><html lang="hu"><head><meta charset="UTF-8"><title>Aláírt szerződés</title>' +
-      "<style>@page{margin:16mm}body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;color:#1a1a1a;max-width:820px;margin:0 auto;padding:28px 24px}h1,h2{color:#171c28}" +
-      '.print-btn{position:fixed;top:14px;right:14px;background:#2378be;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer}' +
-      '.sig{margin-top:28px;border-top:1px solid #e4eaf5;padding-top:16px}.sig img{max-height:120px;border:1px solid #e4eaf5;border-radius:8px;padding:6px;background:#fff}' +
-      '@media print{@page{margin:0}body{padding:14mm;max-width:none}.print-btn{display:none}h1,h2,h3{page-break-after:avoid;break-after:avoid}table,tr{page-break-inside:avoid;break-inside:avoid}}</style></head><body>' +
-      '<button class="print-btn" onclick="window.print()">Nyomtatás / Mentés PDF-ként</button>' +
-      '<div id="doc">Betöltés…</div></body></html>'
-  );
-  win.document.close();
-  firebase
-    .firestore()
-    .collection('contracts')
-    .doc(currentUid)
-    .collection('docs')
-    .doc(lead.contract.contractId)
-    .get()
-    .then((snap) => {
-      const d = snap.exists ? snap.data() : {};
-      const when = (d.signedAt || lead.contract.signedAt || '').replace('T', ' ').slice(0, 16);
-      let html = d.html || '';
-      if (d.signaturePng) {
-
-        const img =
-          '<img src="' + d.signaturePng + '" alt="aláírás" style="max-height:58px;max-width:92%">';
-        const slot = '<div class="rendli-sig-client" style="height:64px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden">';
-        if (html.indexOf(slot) >= 0) html = html.replace(slot, slot + img);
-        else html += '<div style="margin-top:24px;text-align:center"><div style="border-top:1px solid #333;display:inline-block;padding-top:6px">' + img + '</div></div>';
-
-        const stamp =
-          '<p style="margin-top:8px;font-size:11px;color:#777">Elektronikusan aláírta: <strong>' +
-          escHtml(d.signerName || lead.contract.signerName || '') +
-          '</strong> &middot; ' +
-          escHtml(when) +
-          '</p>';
-        const stampSlot = '<div class="rendli-sign-stamp"></div>';
-        if (html.indexOf(stampSlot) >= 0)
-          html = html.replace(stampSlot, '<div class="rendli-sign-stamp">' + stamp + '</div>');
-        else html += stamp;
-      }
-      const docEl = win.document.getElementById('doc');
-      if (docEl) docEl.innerHTML = html;
-    })
-    .catch(() => {
-      const docEl = win.document.getElementById('doc');
-      if (docEl) docEl.textContent = 'A szerződés betöltése nem sikerült.';
-    });
+  // Ugyanazt a szerzodes.html-t nyitjuk meg, mint amit a megrendelő kap — így a vállalkozó és az
+  // ügyfél által letöltött PDF pontosan egyformán néz ki. Az aláírt állapotot a szerzodes.html
+  // a Firestore-ból (signed + signaturePng) ismeri fel.
+  const url =
+    new URL('szerzodes.html', location.href).href +
+    '#c=' +
+    currentUid +
+    '.' +
+    lead.contract.contractId;
+  window.open(url, '_blank');
 }
 
 function openContractModal(leadId) {

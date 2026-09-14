@@ -202,6 +202,10 @@
           if(!snap.exists){ showErr('A szerződés nem található. Lehet, hogy visszavonták, vagy lejárt a link.'); return; }
           DOC = snap.data() || {};
           renderContract(DOC);
+          if (DOC.signed && DOC.signaturePng) {
+            DONE = true;
+            showSigned(DOC.signerName || DOC.toName || '', DOC.signedAt || '', DOC.signaturePng);
+          }
         })
         .catch(function(){ showErr('A szerződés betöltése nem sikerült. Ellenőrizd az internetkapcsolatot, és frissítsd az oldalt.'); });
     } catch(e){ showErr('A szerződés betöltése nem sikerült.'); }
