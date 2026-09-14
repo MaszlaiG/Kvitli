@@ -222,7 +222,8 @@ async function deleteLead(id) {
     return;
   delete state.leads[id];
   save();
-  renderLeadsTable();
+  if (typeof closeLeadDetail === 'function') closeLeadDetail();
+  else renderLeadsTable();
   updateLeadBadge();
   if (typeof renderOrders === 'function') renderOrders();
 }
@@ -313,6 +314,7 @@ function _leadToOrder(lead) {
     clientType: lead.clientType,
     company: lead.company || '',
     tax: lead.tax || '',
+    address: lead.address || '',
     topic: lead.topic,
     budget: lead.budget,
     currency: lead.currency === 'EUR' ? 'EUR' : 'HUF',
@@ -356,12 +358,14 @@ function renderLeadsTable() {
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   if (!leads.length) {
     tbody.innerHTML =
-      '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:24px">Még nincs rögzített megkeresés. Új felvétele a „+ Megkeresés" gombbal.</td></tr>';
+      '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:24px">Még nincs rögzített megkeresés. Új felvétele a „+ Megkeresés" gombbal.</td></tr>';
     return;
   }
   tbody.innerHTML = leads
     .map((lead) => {
       const isNew = lead.status === 'uj';
+      const who = lead.clientType === 'Vállalkozó' && lead.company ? lead.company : lead.name;
+      const priceTxt = lead.price ? Math.round(lead.price).toLocaleString('hu-HU', { useGrouping: true }) + ' Ft' : '—';
       const LEAD_CLASS = {
         uj: 's-red',
         ajanlat: 's-cyan',
@@ -383,67 +387,32 @@ function renderLeadsTable() {
       const _fmtSec = (iso) => escHtml((iso || '').replace('T', ' ').slice(0, 19));
       const offerAccepted = !!(lead.offer && lead.offer.accepted);
       const contractSigned = !!(lead.contract && lead.contract.signed);
-
       const offerBtn = offerAccepted
         ? ''
-        : `<button class="btn btn-secondary btn-sm" onclick="openOfferModal('${lead.id}')" title="Árajánlat összeállítása és küldése"
-        style="margin-left:6px">✉ Ajánlat</button>`;
+        : `<button class="btn btn-secondary btn-sm" onclick="openOfferModal('${lead.id}')" title="Árajánlat összeállítása és küldése" style="margin-left:6px">✉ Ajánlat</button>`;
       const offerSent = offerAccepted
         ? `<div style="font-size:9.5px;color:#1e7a34;margin-top:4px;white-space:nowrap">✓ Ajánlat elfogadva: ${_fmtSec(lead.offer.acceptedAt || lead.offer.sentAt)} · <a onclick="viewOffer('${lead.id}')" style="color:#1e7a34;text-decoration:underline;cursor:pointer">megnézés</a></div>`
         : lead.offer && lead.offer.sentAt
         ? `<div style="font-size:9.5px;color:var(--accent2);margin-top:4px;white-space:nowrap">✓ Ajánlat elküldve: ${escHtml((lead.offer.sentAt || '').slice(0, 10))}</div>`
         : '';
       const contractReady = canSendContract(lead);
-
       const contractBtn = contractSigned
         ? ''
         : contractReady
-        ? `<button class="btn btn-secondary btn-sm" onclick="openContractModal('${lead.id}')" title="Megbízási szerződés összeállítása és küldése"
-          style="margin-left:6px">📄 Szerződés</button>`
-        : `<button class="btn btn-secondary btn-sm" disabled
-          title="Előbb küldd el az árajánlatot, majd állítsd „Ajánlat elfogadva” állapotra"
-          style="margin-left:6px;opacity:.5;cursor:not-allowed">📄 Szerződés</button>`;
+        ? `<button class="btn btn-secondary btn-sm" onclick="openContractModal('${lead.id}')" title="Megbízási szerződés összeállítása és küldése" style="margin-left:6px">📄 Szerződés</button>`
+        : `<button class="btn btn-secondary btn-sm" disabled title="Előbb küldd el az árajánlatot, majd állítsd „Ajánlat elfogadva” állapotra" style="margin-left:6px;opacity:.5;cursor:not-allowed">📄 Szerződés</button>`;
       const contractSent = contractSigned
         ? `<div style="font-size:9.5px;color:#1e7a34;margin-top:4px;white-space:nowrap">✍ Aláírva: ${_fmtSec(lead.contract.signedAt)}${lead.contract.signerName ? ' — ' + escHtml(lead.contract.signerName) : ''} · <a onclick="viewSignedContract('${lead.id}')" style="color:#1e7a34;text-decoration:underline;cursor:pointer">megnézés</a></div>`
         : lead.contract && lead.contract.sentAt
         ? `<div style="font-size:9.5px;color:var(--purple);margin-top:4px;white-space:nowrap">✓ Szerződés elküldve: ${escHtml((lead.contract.sentAt || '').slice(0, 10))}</div>`
         : '';
-      const deleteBtn = `
-      <button title="Megkeresés törlése" onclick="deleteLead('${lead.id}')"
-        style="margin-left:6px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:2px 4px;border-radius:5px"
-        onmouseover="this.style.color='var(--red)';this.style.background='var(--surface2)'"
-        onmouseout="this.style.color='var(--muted)';this.style.background='transparent'">✕</button>`;
-      const priceInput = `
-      <input type="text" inputmode="numeric"
-        value="${lead.price ? Math.round(lead.price).toLocaleString('hu-HU') : ''}"
-        placeholder="0 Ft"
-        style="width:100px;font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--border2);background:var(--surface2)"
-        onblur="setLeadPrice('${lead.id}', parseInt(this.value.replace(/\\D/g,''))||0)"
-        oninput="this.value=this.value.replace(/[^0-9 ]/g,'')">`;
-      const deadlineInput = `
-      <input type="date"
-        value="${lead.deadline || ''}"
-        style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--border2);background:var(--surface2)"
-        onchange="setLeadDeadline('${lead.id}', this.value)">`;
       return `<tr style="${isNew ? 'background:rgba(210,59,59,0.035)' : ''}">
       <td style="color:var(--muted);font-size:11px;white-space:nowrap">${lead.date || '—'}</td>
-      <td>
-        <strong>${escHtml(lead.name)}</strong>
-        ${lead.clientType ? `<span class="badge badge-gray" style="font-size:9.5px;margin-left:4px">${escHtml(lead.clientType)}</span>` : ''}
-        <div style="font-size:10.5px;color:var(--muted)">${escHtml(lead.email)}${lead.phone ? ' · 📞 ' + escHtml(lead.phone) : ''}</div>
-      </td>
-      <td>
-        <span class="badge badge-cyan" style="font-size:10px">${escHtml(lead.type)}</span>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px">${escHtml(lead.topic || '')}</div>
-        ${lead.budget && lead.budget !== 'Nem megadott' ? `<div style="font-size:10px;color:var(--muted)">${escHtml(lead.budget)}</div>` : ''}
-      </td>
-      <td style="max-width:180px">
-        <div style="font-size:11.5px;color:var(--muted);line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical">${escHtml(lead.message || '')}</div>
-      </td>
-      <td>${priceInput}</td>
-      <td>${deadlineInput}</td>
+      <td style="font-weight:600"><span onclick="openLeadDetail('${lead.id}')" style="cursor:pointer;color:var(--accent2);text-decoration:underline dotted" title="Megkeresés részletei">${escHtml(who)}</span>${lead.clientType ? ` <span class="badge badge-gray" style="font-size:9.5px">${escHtml(lead.clientType)}</span>` : ''}</td>
+      <td><span class="badge badge-cyan" style="font-size:10px">${escHtml(lead.type || '—')}</span></td>
+      <td style="font-weight:600">${priceTxt}</td>
       <td style="white-space:nowrap">
-        ${statusSelect}${deleteBtn}
+        ${statusSelect}
         ${offerBtn || contractBtn ? `<div style="margin-top:6px">${offerBtn}${contractBtn}</div>` : ''}
         ${offerSent}
         ${contractSent}
@@ -452,11 +421,252 @@ function renderLeadsTable() {
     })
     .join('');
 }
+function openLeadDetail(id) {
+  const lead = state.leads[id];
+  if (!lead) return;
+  const lv = document.getElementById('leads-list-view');
+  const dv = document.getElementById('lead-detail-view');
+  const c = document.getElementById('lead-detail-content');
+  if (!lv || !dv || !c) return;
+  c.innerHTML = buildLeadDetailHTML(lead);
+  lv.style.display = 'none';
+  dv.style.display = 'block';
+  try {
+    window.scrollTo(0, 0);
+  } catch (e) {}
+}
+function closeLeadDetail() {
+  const lv = document.getElementById('leads-list-view');
+  const dv = document.getElementById('lead-detail-view');
+  if (lv) lv.style.display = 'block';
+  if (dv) dv.style.display = 'none';
+  renderLeadsTable();
+}
+function refreshLeadDetail(id) {
+  const lead = state.leads[id];
+  const converted =
+    !lead ||
+    lead.status === 'atirva' ||
+    lead.status === 'megrendelve' ||
+    (state.orders || []).some((o) => o.leadId === id);
+  if (converted) {
+    closeLeadDetail();
+  } else {
+    const c = document.getElementById('lead-detail-content');
+    if (c) c.innerHTML = buildLeadDetailHTML(lead);
+  }
+}
+function setLeadStatusFromDetail(id, value) {
+  setLeadStatus(id, value);
+  refreshLeadDetail(id);
+}
+function buildLeadDetailHTML(lead) {
+  const _fmtSec = (iso) => escHtml((iso || '').replace('T', ' ').slice(0, 19));
+  const who = lead.clientType === 'Vállalkozó' && lead.company ? lead.company : lead.name;
+  const row = (label, val) =>
+    val
+      ? '<div style="display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted);font-size:12.5px">' +
+        escHtml(label) +
+        '</span><span style="font-size:13px;font-weight:600;text-align:right">' +
+        val +
+        '</span></div>'
+      : '';
+  const dataCard =
+    '<div class="card" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px"><div class="card-title">Megkeresés adatai</div><button class="btn btn-secondary btn-sm" onclick="editLeadData(\'' +
+    lead.id +
+    '\')">✎ Szerkesztés</button></div>' +
+    row('Dátum', escHtml(lead.date || '—')) +
+    row('Megrendelő', escHtml(who)) +
+    row('Ügyféltípus', lead.clientType ? escHtml(lead.clientType) : '') +
+    row('Cég', lead.company ? escHtml(lead.company) : '') +
+    row('Adószám', lead.tax ? escHtml(lead.tax) : '') +
+    row('Székhely', lead.address ? escHtml(lead.address) : '') +
+    row('E-mail', lead.email ? '<a href="mailto:' + escHtml(lead.email) + '" style="color:var(--accent2)">' + escHtml(lead.email) + '</a>' : '') +
+    row('Telefon', lead.phone ? escHtml(lead.phone) : '') +
+    row('Típus', escHtml(lead.type || '—')) +
+    row('Téma', lead.topic ? escHtml(lead.topic) : '') +
+    row('Tervezett keret', lead.budget && lead.budget !== 'Nem megadott' ? escHtml(lead.budget) : '') +
+    row('Határidő', lead.deadline ? escHtml(lead.deadline) : '') +
+    (lead.message
+      ? '<div style="margin-top:12px"><div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Megjegyzés</div><div style="font-size:13px;line-height:1.55">' + escHtml(lead.message) + '</div></div>'
+      : '') +
+    '</div>';
+
+  const LEAD_CLASS = { uj: 's-red', ajanlat: 's-cyan', elfogadva: 's-yellow', szerzodes: 's-purple', megrendelve: 's-green' };
+  const cls = LEAD_CLASS[lead.status] || 's-gray';
+  const statusSelect =
+    `<select class="status-select ${cls}" style="max-width:220px" onchange="setLeadStatusFromDetail('${lead.id}', this.value)">` +
+    Object.entries(LEAD_STATUS_MAP)
+      .filter(([k]) => k !== 'atirva')
+      .map(([k, v]) => `<option value="${k}"${k === lead.status ? ' selected' : ''}>${v.label}</option>`)
+      .join('') +
+    '</select>';
+  const manageCard =
+    '<div class="card" style="margin-bottom:16px"><div class="card-title" style="margin-bottom:12px">Állapot</div>' +
+    '<div style="display:flex;flex-direction:column;gap:6px;min-width:160px;max-width:240px">' +
+    statusSelect +
+    '</div></div>';
+
+  const header =
+    '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;flex-wrap:wrap"><h2 style="margin:0;font-size:20px">' +
+    escHtml(who) +
+    '</h2>' +
+    (lead.clientType ? '<span class="badge badge-gray">' + escHtml(lead.clientType) + '</span>' : '') +
+    '</div>';
+  const deleteCard =
+    '<div class="card" style="margin-top:16px"><button class="btn btn-secondary btn-sm" onclick="deleteLead(\'' +
+    lead.id +
+    '\')" style="color:var(--red)">✕ Megkeresés törlése</button></div>';
+  return header + dataCard + manageCard + buildOfferContractCard(lead) + deleteCard;
+}
+// Közös "Árajánlat és szerződés" kártya — a megrendelés- és a projekt-részletező is ezt használja.
+// Az események (kiküldés, elfogadás, szerződés kiküldése, aláírás) másodpercre pontos dátummal;
+// a tényleges PDF a "Megtekintés" gombbal nyílik meg.
+function buildOfferContractCard(lead) {
+  if (!lead) {
+    return '<div class="card"><div class="card-title">Árajánlat és szerződés</div><div style="color:var(--muted);font-size:13px;margin-top:6px">Nincs kapcsolódó megkeresés.</div></div>';
+  }
+  const id = lead.id;
+  const sec = (iso) => escHtml((iso || '').replace('T', ' ').slice(0, 19));
+  const offerAccepted = !!(lead.offer && lead.offer.accepted);
+  const contractSigned = !!(lead.contract && lead.contract.signed);
+  const contractReady = typeof canSendContract === 'function' ? canSendContract(lead) : !!(lead.offer && lead.offer.accepted);
+
+  const offerBtn = offerAccepted
+    ? ''
+    : `<button class="btn btn-secondary btn-sm" onclick="openOfferModal('${id}')">✉ Árajánlat összeállítása</button>`;
+  let offerLines = '';
+  if (lead.offer && lead.offer.sentAt)
+    offerLines += `<div style="font-size:12.5px;color:var(--accent2)">✉ Elküldve: ${sec(lead.offer.sentAt)}</div>`;
+  if (offerAccepted)
+    offerLines += `<div style="font-size:12.5px;color:#1e7a34">✓ Elfogadva: ${sec(lead.offer.acceptedAt || lead.offer.sentAt)}</div>`;
+  if (!offerLines) offerLines = '<div style="font-size:12.5px;color:var(--muted)">Még nincs árajánlat.</div>';
+  const offerView =
+    lead.offer && (lead.offer.sentAt || offerAccepted)
+      ? `<button class="btn btn-secondary btn-sm" onclick="viewOffer('${id}')">Megtekintés</button>`
+      : '';
+
+  const contractBtn = contractSigned
+    ? ''
+    : contractReady
+    ? `<button class="btn btn-secondary btn-sm" onclick="openContractModal('${id}')">📄 Szerződés összeállítása</button>`
+    : `<button class="btn btn-secondary btn-sm" disabled title="Előbb küldd el az árajánlatot, majd állítsd „Ajánlat elfogadva” állapotra" style="opacity:.5;cursor:not-allowed">📄 Szerződés</button>`;
+  let contractLines = '';
+  if (lead.contract && lead.contract.sentAt)
+    contractLines += `<div style="font-size:12.5px;color:var(--purple)">✉ Elküldve: ${sec(lead.contract.sentAt)}</div>`;
+  if (contractSigned)
+    contractLines += `<div style="font-size:12.5px;color:#1e7a34">✍ Aláírva: ${sec(lead.contract.signedAt)}${lead.contract.signerName ? ' — ' + escHtml(lead.contract.signerName) : ''}</div>`;
+  if (!contractLines) contractLines = '<div style="font-size:12.5px;color:var(--muted)">Még nincs szerződés.</div>';
+  const contractView =
+    lead.contract && lead.contract.contractId
+      ? `<button class="btn btn-secondary btn-sm" onclick="viewSignedContract('${id}')">Megtekintés</button>`
+      : '';
+
+  const line = (btn, lines, view) =>
+    '<div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">' +
+    (btn ? '<div>' + btn + '</div>' : '') +
+    '<div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:180px">' +
+    lines +
+    '</div>' +
+    (view ? '<div>' + view + '</div>' : '') +
+    '</div>';
+  return (
+    '<div class="card"><div class="card-title" style="margin-bottom:12px">Árajánlat és szerződés</div>' +
+    '<div style="margin-bottom:14px">' +
+    line(offerBtn, offerLines, offerView) +
+    '</div>' +
+    line(contractBtn, contractLines, contractView) +
+    '</div>'
+  );
+}
+function editLeadData(id) {
+  const lead = state.leads[id];
+  if (!lead) return;
+  const c = document.getElementById('lead-detail-content');
+  if (!c) return;
+  c.innerHTML = buildLeadEditForm(lead);
+  try {
+    window.scrollTo(0, 0);
+  } catch (e) {}
+}
+function cancelLeadEdit(id) {
+  openLeadDetail(id);
+}
+function saveLeadData(id) {
+  const lead = state.leads[id];
+  if (!lead) return;
+  const gv = (k) => {
+    const el = document.getElementById('led-edit-' + k);
+    return el ? el.value.trim() : '';
+  };
+  const nm = gv('name');
+  if (nm) lead.name = nm;
+  lead.email = gv('email');
+  lead.phone = gv('phone');
+  lead.company = gv('company');
+  lead.tax = gv('tax');
+  lead.address = gv('address');
+  lead.deadline = gv('deadline');
+  save();
+  renderLeadsTable();
+  openLeadDetail(id);
+}
+function buildLeadEditForm(lead) {
+  const av = (s) =>
+    String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  const inputStyle =
+    'padding:9px 11px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);font-size:13px;font-family:inherit;width:100%';
+  const labelStyle = 'font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px';
+  const field = (k, label, val, type) =>
+    '<div style="display:flex;flex-direction:column;gap:6px"><label style="' +
+    labelStyle +
+    '">' +
+    av(label) +
+    '</label><input id="led-edit-' +
+    k +
+    '" type="' +
+    (type || 'text') +
+    '" value="' +
+    av(val) +
+    '" style="' +
+    inputStyle +
+    '"></div>';
+  const grid =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">' +
+    field('name', 'Megrendelő neve', lead.name) +
+    field('email', 'E-mail', lead.email, 'email') +
+    field('phone', 'Telefon', lead.phone) +
+    field('company', 'Cég neve', lead.company) +
+    field('tax', 'Adószám', lead.tax) +
+    field('address', 'Székhely', lead.address) +
+    field('deadline', 'Határidő', lead.deadline, 'date') +
+    '</div>';
+  const buttons =
+    '<div style="display:flex;gap:10px;margin-top:16px">' +
+    '<button class="btn btn-sm" onclick="saveLeadData(\'' +
+    lead.id +
+    '\')">Mentés</button>' +
+    '<button class="btn btn-secondary btn-sm" onclick="cancelLeadEdit(\'' +
+    lead.id +
+    '\')">Mégsem</button></div>';
+  return (
+    '<div style="margin-bottom:14px"><h2 style="margin:0;font-size:20px">Megkeresés szerkesztése</h2></div>' +
+    '<div class="card">' +
+    grid +
+    buttons +
+    '</div>'
+  );
+}
 const _origShowTab = window.showTab;
 window.showTab = function (id) {
   _origShowTab && _origShowTab(id);
   if (id === 'orders') {
-    renderLeadsTable();
+    if (typeof closeLeadDetail === 'function') closeLeadDetail();
+    else renderLeadsTable();
     updateLeadBadge();
   }
   if (id === 'projects') {
@@ -473,7 +683,7 @@ document.addEventListener('swm:ready', () => {
   initPortfolioInboxSync();
 });
 function _offerFt(n) {
-  return Math.round(Number(n) || 0).toLocaleString('hu-HU') + ' Ft';
+  return Math.round(Number(n) || 0).toLocaleString('hu-HU', { useGrouping: true }) + ' Ft';
 }
 function offerAddRow(desc, qty, price, recurring) {
   const box = document.getElementById('offer-items');

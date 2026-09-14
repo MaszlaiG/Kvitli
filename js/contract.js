@@ -31,7 +31,7 @@ function _contractCtx(lead) {
 }
 
 function _ft(n) {
-  return Math.round(Number(n) || 0).toLocaleString('hu-HU') + ' Ft';
+  return Math.round(Number(n) || 0).toLocaleString('hu-HU', { useGrouping: true }) + ' Ft';
 }
 
 function _contractItems(ctx) {

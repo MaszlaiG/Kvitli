@@ -551,6 +551,7 @@
           </div>
 
           <div class="tab-content" id="tab-orders">
+            <div id="leads-list-view">
             <div class="card" style="margin-bottom: 20px; border-color: rgba(210, 59, 59, 0.25)">
               <div
                 style="
@@ -583,23 +584,29 @@
                   <thead>
                     <tr>
                       <th>Dátum</th>
-                      <th>Ügyfél</th>
-                      <th>Típus / téma</th>
-                      <th>Üzenet</th>
-                      <th>Beárazás (Ft)</th>
-                      <th>Határidő</th>
+                      <th>Megrendelő</th>
+                      <th>Típus</th>
+                      <th>Ár</th>
                       <th>Állapot</th>
                     </tr>
                   </thead>
                   <tbody id="leads-tbody">
                     <tr>
-                      <td colspan="7" style="color: var(--muted); text-align: center; padding: 20px">
+                      <td colspan="5" style="color: var(--muted); text-align: center; padding: 20px">
                         Még nincs rögzített megkeresés. Új felvétele a „+ Megkeresés" gombbal.
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
+            </div>
+            </div>
+
+            <div id="lead-detail-view" style="display: none">
+              <div style="margin-bottom: 12px">
+                <button class="btn btn-secondary" onclick="closeLeadDetail()">← Vissza a megrendelésekhez</button>
+              </div>
+              <div id="lead-detail-content"></div>
             </div>
 
             <div class="modal" id="lead-modal" onclick="if(event.target===this)closeModal('lead-modal')">

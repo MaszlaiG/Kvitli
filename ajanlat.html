@@ -85,7 +85,7 @@
   <div id="toast" class="toast" hidden></div>
   <div id="app"></div>
 <script>
-  function ft(n){ return Math.round(Number(n)||0).toLocaleString('hu-HU') + ' Ft'; }
+  function ft(n){ return Math.round(Number(n)||0).toLocaleString('hu-HU', { useGrouping: true }) + ' Ft'; }
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function initial(s){ s=(s||'').trim(); return s ? s.charAt(0).toUpperCase() : 'R'; }
 

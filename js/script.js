@@ -883,13 +883,17 @@ function nextOrderNum(dateStr) {
   if (!state.orderNumByYear) state.orderNumByYear = {};
   const seq = (state.orderNumByYear[year] || 0) + 1;
   state.orderNumByYear[year] = seq;
-  return 'rendli/' + year + '/' + pad3(seq);
+  return 'kvitli/' + year + '/' + pad3(seq);
 }
 function migrateOrderNumbers() {
   if (!Array.isArray(state.orders)) return;
   if (!state.orderNumByYear || typeof state.orderNumByYear !== 'object') state.orderNumByYear = {};
+  // Régi "rendli/..." azonosítók átnevezése "kvitli/..."-re (a sorszám megmarad)
   state.orders.forEach((o) => {
-    const m = o.num && /^rendli\/(\d{4})\/(\d+)$/.exec(o.num);
+    if (o.num && /^rendli\//.test(o.num)) o.num = o.num.replace(/^rendli\//, 'kvitli/');
+  });
+  state.orders.forEach((o) => {
+    const m = o.num && /^(?:rendli|kvitli)\/(\d{4})\/(\d+)$/.exec(o.num);
     if (m) {
       const y = m[1],
         n = parseInt(m[2], 10);
@@ -906,9 +910,8 @@ function migrateOrderNumbers() {
     });
 }
 function nextInvoiceNumForOrder(order) {
-  const base = order && order.num ? order.num : 'rendli/' + now().slice(0, 4) + '/000';
-  const seq = (state.invoices || []).filter((iv) => order && iv.orderId === order.id).length + 1;
-  return 'sz_' + base + '_' + pad3(seq);
+  // A számla sorszáma megegyezik a megrendelés azonosítójával (pl. kvitli/2026/001)
+  return order && order.num ? order.num : 'kvitli/' + now().slice(0, 4) + '/000';
 }
 const FX_FALLBACK_EUR_HUF = 400;
 function eurHufRate() {
@@ -923,7 +926,7 @@ function orderPriceHuf(o) {
 }
 function fmtCur(amount, cur) {
   const n = Math.round(Number(amount) || 0);
-  return cur === 'EUR' ? '€' + n.toLocaleString('hu-HU') : n.toLocaleString('hu-HU') + ' Ft';
+  return cur === 'EUR' ? '€' + n.toLocaleString('hu-HU', { useGrouping: true }) : n.toLocaleString('hu-HU', { useGrouping: true }) + ' Ft';
 }
 function fetchEurHuf() {
   try {
@@ -1595,17 +1598,17 @@ function inboxEmbedSnippet() {
   var mount = document.getElementById("rendli-order-mount");
   var CFG = {}, LANG = "hu";
   var T = {
-    hu: { name:"Név", email:"E-mail", company:"Cég neve", tax:"Adószám", priv:"Magánszemély", biz:"Vállalkozó", choose:"Válassz szolgáltatást…", service:"Munka típusa", phone:"Telefon", budget:"Tervezett keret", message:"Üzenet", submit:"Rendelés elküldése", thanks:"Köszönjük, a rendelést megkaptuk!", err:"Hiba történt a küldéskor, próbáld újra.", needCo:"Vállalkozóként a cég nevét kötelező megadni.", badEmail:"Az e-mail cím érvénytelennek tűnik (pl. hiányzó pont a domainben). Kérlek ellenőrizd, hogy oda küldjük a visszaigazolást.", mo:"/ hó", moWord:"havi", moTag:"[Havidíjas szolgáltatás]" },
-    en: { name:"Name", email:"Email", company:"Company name", tax:"VAT number", priv:"Individual", biz:"Company", choose:"Choose a service…", service:"Type of work", phone:"Phone", budget:"Budget", message:"Message", submit:"Send order", thanks:"Thank you, we received your order!", err:"Something went wrong, please try again.", needCo:"Company name is required.", badEmail:"The email address looks invalid (e.g. a missing dot in the domain). Please check it — we send the confirmation there.", mo:"/ mo", moWord:"monthly", moTag:"[Monthly service]" }
+    hu: { name:"Név", email:"E-mail", company:"Cég neve", tax:"Adószám", address:"Székhely", priv:"Magánszemély", biz:"Vállalkozó", choose:"Válassz szolgáltatást…", service:"Munka típusa", phone:"Telefon", budget:"Tervezett keret", message:"Üzenet", submit:"Rendelés elküldése", thanks:"Köszönjük, a rendelést megkaptuk!", err:"Hiba történt a küldéskor, próbáld újra.", needCo:"Vállalkozóként a cég nevét kötelező megadni.", badEmail:"Az e-mail cím érvénytelennek tűnik (pl. hiányzó pont a domainben). Kérlek ellenőrizd, hogy oda küldjük a visszaigazolást.", mo:"/ hó", moWord:"havi", moTag:"[Havidíjas szolgáltatás]" },
+    en: { name:"Name", email:"Email", company:"Company name", tax:"VAT number", address:"Registered seat", priv:"Individual", biz:"Company", choose:"Choose a service…", service:"Type of work", phone:"Phone", budget:"Budget", message:"Message", submit:"Send order", thanks:"Thank you, we received your order!", err:"Something went wrong, please try again.", needCo:"Company name is required.", badEmail:"The email address looks invalid (e.g. a missing dot in the domain). Please check it — we send the confirmation there.", mo:"/ mo", moWord:"monthly", moTag:"[Monthly service]" }
   };
   var EMAILJS = { publicKey: "${EMAILJS_CFG.publicKey}", serviceId: "${EMAILJS_CFG.serviceId}", templateCustomer: "${EMAILJS_CFG.templateCustomer}", templateOwner: "${EMAILJS_CFG.templateOwner}" };
   var M = {
     hu: { cSub:"Visszaigazolás — ", cHi:"Köszönjük a megrendelésed!", cIn:"Megkaptuk a rendelésed, hamarosan felvesszük veled a kapcsolatot. Az összesítés:", cTag:"Megrendelés visszaigazolás", cFoot:"Kérdésed van? Egyszerűen válaszolj erre az e-mailre — a levelet a rendszer erre a címre irányítja.",
           oSub:"Új megrendelés — ", oHi:"Új megrendelés érkezett", oIn:"Az alábbi rendelés futott be a weboldalad űrlapján keresztül:", oTag:"Új megrendelés", oFoot:"Válaszolj erre az e-mailre, és közvetlenül az ügyfélnek írsz — a levél az ő címére megy.",
-          svc:"Szolgáltatás", price:"Ár", date:"Dátum", nm:"Név", em:"E-mail", ph:"Telefon", msg:"Üzenet", deadline:"Kívánt határidő", budget:"Tervezett keret", ctype:"Ügyféltípus", comp:"Cég", tax:"Adószám", mo:"/ hó" },
+          svc:"Szolgáltatás", price:"Ár", date:"Dátum", nm:"Név", em:"E-mail", ph:"Telefon", msg:"Üzenet", deadline:"Kívánt határidő", budget:"Tervezett keret", ctype:"Ügyféltípus", comp:"Cég", tax:"Adószám", addr:"Székhely", mo:"/ hó" },
     en: { cSub:"Confirmation — ", cHi:"Thank you for your order!", cIn:"We've received your order and will get back to you shortly. Here's the summary:", cTag:"Order confirmation", cFoot:"Questions? Just reply to this email — it goes straight to us.",
           oSub:"New order — ", oHi:"New order received", oIn:"The following order came in through your website form:", oTag:"New order", oFoot:"Reply to this email to write directly to the customer — it goes to their address.",
-          svc:"Service", price:"Price", date:"Date", nm:"Name", em:"Email", ph:"Phone", msg:"Message", deadline:"Deadline", budget:"Budget", ctype:"Client type", comp:"Company", tax:"VAT number", mo:"/ mo" }
+          svc:"Service", price:"Price", date:"Date", nm:"Name", em:"Email", ph:"Phone", msg:"Message", deadline:"Deadline", budget:"Budget", ctype:"Client type", comp:"Company", tax:"VAT number", addr:"Registered seat", mo:"/ mo" }
   };
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
   function rendliNotify(msg) {
@@ -1630,7 +1633,7 @@ function inboxEmbedSnippet() {
     ov.appendChild(card); document.body.appendChild(ov);
     try { btn.focus(); } catch (e) {}
   }
-  function ft(n, lang) { n = Math.round(Number(n) || 0); return lang === "en" ? "€" + n.toLocaleString("hu-HU") : n.toLocaleString("hu-HU") + " Ft"; }
+  function ft(n, lang) { n = Math.round(Number(n) || 0); return lang === "en" ? "€" + n.toLocaleString("hu-HU", { useGrouping: true }) : n.toLocaleString("hu-HU", { useGrouping: true }) + " Ft"; }
   function priceFor(s, lang) {
     if (lang === "en") {
       var eur = Number(s.priceEur) || 0;
@@ -1690,7 +1693,7 @@ function inboxEmbedSnippet() {
     var rows =
       erow(m.nm, data.name) + erowMail(m.em, data.email) + erowPhone(m.ph, x.phone) +
       erow(m.svc, svc) + erow(m.price, priceTxt) +
-      erow(m.ctype, x.clientType) + erow(m.comp, x.company) + erow(m.tax, x.tax) +
+      erow(m.ctype, x.clientType) + erow(m.comp, x.company) + erow(m.tax, x.tax) + erow(m.addr, x.address) +
       erow(m.deadline, x.deadline) + erow(m.budget, x.budget) +
       erow(m.msg, x.message) + erow(m.date, data.date);
     var telC = x.phone ? String(x.phone).replace(/[^\\d+]/g, "") : "";
@@ -1725,7 +1728,7 @@ function inboxEmbedSnippet() {
     h += '<input name="email" type="email" placeholder="' + esc(t.email) + ' *" required>';
     if (fc.business) {
       h += '<select name="clientType"><option>' + esc(t.priv) + '</option><option>' + esc(t.biz) + '</option></select>';
-      h += '<span data-biz style="display:none"><input name="companyName" placeholder="' + esc(t.company) + ' *"><input name="taxNumber" placeholder="' + esc(t.tax) + '"></span>';
+      h += '<span data-biz style="display:none"><input name="companyName" placeholder="' + esc(t.company) + ' *"><input name="taxNumber" placeholder="' + esc(t.tax) + '"><input name="address" placeholder="' + esc(t.address) + '"></span>';
     }
     if (services.length) {
       h += '<select name="type" required><option value="">' + esc(t.choose) + '</option>';
@@ -1770,11 +1773,11 @@ function inboxEmbedSnippet() {
         return;
       }
       var phoneV = f.phone ? g("phone") : "", budgetV = f.budget ? g("budget") : "", deadlineV = f.deadline ? g("deadline") : "";
-      var rawMsg = g("message"), ctV = "", coV = "", taxV = "";
+      var rawMsg = g("message"), ctV = "", coV = "", taxV = "", addrV = "";
       if (fc.business) {
         ctV = g("clientType") || t.priv;
         if (ctV === t.biz && !g("companyName")) { rendliNotify(t.needCo); return; }
-        coV = g("companyName"); taxV = g("taxNumber");
+        coV = g("companyName"); taxV = g("taxNumber"); addrV = g("address");
       }
       var msg = rawMsg;
       if (per === "monthly") msg += (msg ? "\\n\\n" : "") + t.moTag;
@@ -1783,14 +1786,14 @@ function inboxEmbedSnippet() {
       var data = { name: nameV, email: emailV, type: g("type"), key: KEY, status: "uj", price: price, currency: currency, date: new Date().toISOString().slice(0, 10), createdAt: Date.now() };
       if (currency === "EUR") data.fxRate = Number(CFG.eurHuf) || 0;
       if (fc.business) data.clientType = (ctV === t.biz) ? "Vállalkozó" : "Magánszemély";
-      if (fc.business && ctV === t.biz) { if (coV) data.company = coV; if (taxV) data.tax = taxV; }
+      if (fc.business && ctV === t.biz) { if (coV) data.company = coV; if (taxV) data.tax = taxV; if (addrV) data.address = addrV; }
       if (f.phone)    data.phone = phoneV;
       if (f.budget)   data.budget = budgetV;
       if (f.deadline) data.deadline = deadlineV;
       data.message = msg;
       db.addInbox(data)
         .then(function () {
-          try { sendConfirmations(data, { locName: locName, phone: phoneV, budget: budgetV, deadline: deadlineV, clientType: (fc.business ? ctV : ""), company: coV, tax: taxV, message: rawMsg, period: per }); } catch (e) {}
+          try { sendConfirmations(data, { locName: locName, phone: phoneV, budget: budgetV, deadline: deadlineV, clientType: (fc.business ? ctV : ""), company: coV, tax: taxV, address: addrV, message: rawMsg, period: per }); } catch (e) {}
           form.reset(); rendliNotify(t.thanks);
         })
         .catch(function (err) { console.error(err); rendliNotify(t.err); });
@@ -1825,7 +1828,7 @@ function priceListSnippet() {
   function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
   function pageLang(){var l=(document.documentElement.getAttribute("lang")||"").toLowerCase();if(l.indexOf("en")===0)return "en";if(l.indexOf("hu")===0)return "hu";return null;}
   function pickLang(){ if(window.RENDLI_LANG==="hu"||window.RENDLI_LANG==="en")return window.RENDLI_LANG; return pageLang()||"hu"; }
-  function money(v,EN){ v=Math.round(+v||0); return EN?("\\u20AC"+v.toLocaleString("hu-HU")):(v.toLocaleString("hu-HU")+" Ft"); }
+  function money(v,EN){ v=Math.round(+v||0); return EN?("\\u20AC"+v.toLocaleString("hu-HU", { useGrouping: true })):(v.toLocaleString("hu-HU", { useGrouping: true })+" Ft"); }
   function priceText(s,EN,rate){
     if(s.priceMode==="free") return EN?"Free":"Ingyenes";
     var v; if(EN){ v=+s.priceEur||0; if(!v&&rate>0) v=Math.round((+s.price||0)/rate); } else { v=+s.price||0; }
@@ -1877,8 +1880,8 @@ function formPreviewHtml() {
   const rate = typeof eurHufRate === 'function' ? eurHufRate() : 400;
   const money = (n) =>
     en
-      ? '€' + Math.round(Number(n) || 0).toLocaleString('hu-HU')
-      : (Number(n) || 0).toLocaleString('hu-HU') + ' Ft';
+      ? '€' + Math.round(Number(n) || 0).toLocaleString('hu-HU', { useGrouping: true })
+      : (Number(n) || 0).toLocaleString('hu-HU', { useGrouping: true }) + ' Ft';
   const svcPrice = (s) =>
     en
       ? Number(s.priceEur) > 0
@@ -2027,14 +2030,14 @@ function renderServiceRows() {
           <span class="fc-srv-lbl">Magyar · Ft</span>
           <input type="text" value="${escHtml(s.name)}" placeholder="Szolgáltatás neve"
             oninput="updateService(${i},'name',this.value)">
-          <input type="text" inputmode="numeric" value="${s.price ? Math.round(s.price).toLocaleString('hu-HU') : ''}" placeholder="Ár (Ft)"
+          <input type="text" inputmode="numeric" value="${s.price ? Math.round(s.price).toLocaleString('hu-HU', { useGrouping: true }) : ''}" placeholder="Ár (Ft)"
             oninput="formatThousands(this);updateService(${i},'price',this.value)" style="text-align:right">
         </div>
         <div class="fc-srv-en">
           <span class="fc-srv-lbl">English · €</span>
           <input type="text" value="${escHtml(s.nameEn || '')}" placeholder="Service name (English)"
             oninput="updateService(${i},'nameEn',this.value)">
-          <input type="text" inputmode="numeric" value="${s.priceEur ? Math.round(s.priceEur).toLocaleString('hu-HU') : ''}" placeholder="Price (€) — automatikus, ha üres"
+          <input type="text" inputmode="numeric" value="${s.priceEur ? Math.round(s.priceEur).toLocaleString('hu-HU', { useGrouping: true }) : ''}" placeholder="Price (€) — automatikus, ha üres"
             oninput="formatThousands(this);updateService(${i},'priceEur',this.value)" style="text-align:right">
         </div>
       </div>
@@ -2247,7 +2250,7 @@ const fmt = (n) => {
     const r = typeof eurHufRate === 'function' ? eurHufRate() : 400;
     return '€' + Math.round(Number(n) / r).toLocaleString('en-US');
   }
-  return Math.round(n).toLocaleString('hu-HU') + ' Ft';
+  return Math.round(n).toLocaleString('hu-HU', { useGrouping: true }) + ' Ft';
 };
 const fmtNum = (n) =>
   parseFloat(n.toFixed(5)).toLocaleString('hu-HU', {
@@ -2256,7 +2259,7 @@ const fmtNum = (n) =>
 function formatThousands(el) {
   const caretFromEnd = el.value.length - el.selectionStart;
   const digits = el.value.replace(/\D/g, '');
-  el.value = digits ? parseInt(digits, 10).toLocaleString('hu-HU') : '';
+  el.value = digits ? parseInt(digits, 10).toLocaleString('hu-HU', { useGrouping: true }) : '';
   const newPos = Math.max(0, el.value.length - caretFromEnd);
   el.setSelectionRange(newPos, newPos);
 }
@@ -2951,8 +2954,8 @@ function renderOrders() {
             const isLocked = o.status === 'eles' || o.status === 'torolve';
             const who = o.clientType === 'Vállalkozó' && o.company ? o.company : o.name;
             return `<tr style="${isTorolve ? 'opacity:0.45' : ''}">
-          <td style="font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap">${escHtml(o.num || '—')}</td>
-          <td style="font-weight:600"><span onclick="openOrderDetail('${o.id}')" style="cursor:pointer;color:var(--accent2);text-decoration:underline dotted" title="Projekt részletei">${escHtml(who)}</span></td>
+          <td style="font-family:var(--mono);font-size:11.5px;white-space:nowrap"><span onclick="openOrderDetail('${o.id}')" style="cursor:pointer;color:var(--accent2);text-decoration:underline dotted" title="Projekt részletei">${escHtml(o.num || '—')}</span></td>
+          <td style="font-weight:600">${escHtml(who)}</td>
           <td>${o.type}</td>
           <td style="font-weight:600">${isTorolve ? '<span style="color:var(--muted)">' + fmt(orderPriceHuf(o)) + '</span>' : fmt(orderPriceHuf(o))}</td>
           <td style="white-space:nowrap${late ? ';color:var(--red);font-weight:600' : ''}">${o.deadline || '—'}${late ? ' — lejárt' : ''}</td>
@@ -2999,6 +3002,7 @@ function buildOrderDetailHTML(o) {
     row('Ügyféltípus', o.clientType ? escHtml(o.clientType) : '') +
     row('Cég', o.company ? escHtml(o.company) : '') +
     row('Adószám', o.tax ? escHtml(o.tax) : '') +
+    row('Székhely', o.address ? escHtml(o.address) : '') +
     row('E-mail', o.email ? '<a href="mailto:' + escHtml(o.email) + '" style="color:var(--accent2)">' + escHtml(o.email) + '</a>' : '') +
     row('Telefon', o.phone ? escHtml(o.phone) : '') +
     row('Típus', escHtml(o.type || '—')) +
@@ -3008,68 +3012,21 @@ function buildOrderDetailHTML(o) {
     row('Dátum', escHtml(o.date || '—')) +
     row('Határidő', o.deadline ? escHtml(o.deadline) : '—') +
     row('Állapot', '<span class="badge ' + (st.badge || 'badge-gray') + '">' + escHtml(st.label) + '</span>') +
-    (o.note ? '<div style="margin-top:10px;color:var(--muted);font-size:12.5px;line-height:1.5">' + escHtml(o.note) + '</div>' : '') +
+    ((lead && lead.message)
+      ? '<div style="margin-top:12px"><div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Megjegyzés</div><div style="font-size:13px;line-height:1.55">' + escHtml(lead.message) + '</div></div>'
+      : '') +
     '</div>';
-  let offerCard;
-  if (lead && lead.offer && Array.isArray(lead.offer.items) && lead.offer.items.length) {
-    const of = lead.offer;
-    const t = {
-      net: of.net,
-      vat: of.vat,
-      gross: of.gross,
-      netMo: of.netMo || 0,
-      vatMo: of.vatMo || 0,
-      grossMo: of.grossMo || 0,
-      hasMo: !!of.grossMo || of.items.some((i) => i.recurring),
-      vatReg: of.vatReg,
-      vatRate: of.vatRate
-    };
-    const details = typeof _offerDetailsHtml === 'function' ? _offerDetailsHtml(of.items, t, of.validUntil || '') : '';
-    const statusLine = of.accepted
-      ? '<span class="badge badge-green">Elfogadva</span> ' + escHtml((of.acceptedAt || of.sentAt || '').slice(0, 10))
-      : of.sentAt
-      ? '<span class="badge badge-cyan">Elküldve</span> ' + escHtml((of.sentAt || '').slice(0, 10))
-      : '';
-    offerCard =
-      '<div class="card" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px"><div class="card-title">Árajánlat</div><div style="font-size:12px">' +
-      statusLine +
-      ' · <a onclick="viewOffer(\'' +
-      o.leadId +
-      '\')" style="color:var(--accent2);text-decoration:underline;cursor:pointer">megnyitás</a></div></div>' +
-      details +
-      '</div>';
-  } else {
-    offerCard =
-      '<div class="card" style="margin-bottom:16px"><div class="card-title">Árajánlat</div><div style="color:var(--muted);font-size:13px;margin-top:6px">Ehhez a projekthez nincs rögzített árajánlat.</div></div>';
-  }
-  let contractCard;
-  if (lead && lead.contract && lead.contract.contractId) {
-    const ct = lead.contract;
-    const line = ct.signed
-      ? '<span class="badge badge-green">Aláírva</span> ' +
-        escHtml((ct.signedAt || '').replace('T', ' ').slice(0, 16)) +
-        (ct.signerName ? ' — ' + escHtml(ct.signerName) : '')
-      : '<span class="badge badge-purple">Elküldve</span> ' + escHtml((ct.sentAt || '').slice(0, 10));
-    contractCard =
-      '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px"><div class="card-title">Szerződés</div><div style="font-size:12px"><a onclick="viewSignedContract(\'' +
-      o.leadId +
-      '\')" style="color:var(--accent2);text-decoration:underline;cursor:pointer">megnyitás / PDF</a></div></div>' +
-      '<div style="font-size:13px">' +
-      escHtml(ct.docType || 'Szerződés') +
-      '</div><div style="font-size:12.5px;color:var(--muted);margin-top:4px">' +
-      line +
-      '</div></div>';
-  } else {
-    contractCard =
-      '<div class="card"><div class="card-title">Szerződés</div><div style="color:var(--muted);font-size:13px;margin-top:6px">Ehhez a projekthez nincs rögzített szerződés.</div></div>';
-  }
+  const offerContractCard =
+    typeof buildOfferContractCard === 'function' && lead
+      ? buildOfferContractCard(lead)
+      : '<div class="card"><div class="card-title">Árajánlat és szerződés</div><div style="color:var(--muted);font-size:13px;margin-top:6px">Nincs kapcsolódó megkeresés.</div></div>';
   const header =
     '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;flex-wrap:wrap"><h2 style="margin:0;font-size:20px">' +
     escHtml(o.name || 'Projekt') +
     '</h2><span style="font-family:var(--mono);font-size:12px;color:var(--muted)">' +
     escHtml(o.num || '') +
     '</span></div>';
-  return header + dataCard + offerCard + contractCard;
+  return header + dataCard + offerContractCard;
 }
 function renderBizDash() {
   const revEl = document.getElementById('bd-rev');
@@ -3441,7 +3398,7 @@ function invUpdatePreview() {
   if (el)
     el.textContent =
       qty && price
-        ? L('Végösszeg', 'Total') + ': ' + Math.round(qty * price).toLocaleString('hu-HU') + ' Ft'
+        ? L('Végösszeg', 'Total') + ': ' + Math.round(qty * price).toLocaleString('hu-HU', { useGrouping: true }) + ' Ft'
         : '';
 }
 function invSave() {
@@ -3655,8 +3612,8 @@ function invDownloadPDF(id) {
   const fx = Number(inv.fxRate) || eurHufRate();
   const fmtM = (n) =>
     cur === 'EUR'
-      ? '€' + Math.round(n).toLocaleString('hu-HU')
-      : Math.round(n).toLocaleString('hu-HU') + ' Ft';
+      ? '€' + Math.round(n).toLocaleString('hu-HU', { useGrouping: true })
+      : Math.round(n).toLocaleString('hu-HU', { useGrouping: true }) + ' Ft';
   const esc = (s) =>
     String(s || '')
       .replace(/&/g, '&amp;')
@@ -3675,7 +3632,7 @@ function invDownloadPDF(id) {
     .join('');
   const eurNote =
     cur === 'EUR'
-      ? `<div class="aam" style="font-style:normal;color:#3a4257">Átváltás tájékoztató jelleggel — 1 € = ${Math.round(fx).toLocaleString('hu-HU')} Ft · Fizetendő HUF-ban: <strong>${Math.round(gross * fx).toLocaleString('hu-HU')} Ft</strong></div>`
+      ? `<div class="aam" style="font-style:normal;color:#3a4257">Átváltás tájékoztató jelleggel — 1 € = ${Math.round(fx).toLocaleString('hu-HU', { useGrouping: true })} Ft · Fizetendő HUF-ban: <strong>${Math.round(gross * fx).toLocaleString('hu-HU', { useGrouping: true })} Ft</strong></div>`
       : '';
   const totalsHtml =
     (vatReg
@@ -3693,7 +3650,7 @@ function invDownloadPDF(id) {
   .sheet{max-width:820px;margin:0 auto;background:#ffffff;border:1px solid #dbe2f0;border-radius:12px;padding:44px 46px}
   .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:38px}
   .brand{display:flex;align-items:center;gap:11px}
-  .brand .tile{width:34px;height:34px;flex:0 0 34px}
+  .brand .tile{width:34px;height:34px;flex:0 0 34px;object-fit:contain}
   .logo{font-family:'Inter',sans-serif;font-size:22px;font-weight:800;letter-spacing:-0.02em;color:#171c28}.logo span{color:#2378be}
   .inv-meta{text-align:right}
   .inv-meta h1{font-family:'Inter',sans-serif;font-size:32px;font-weight:800;letter-spacing:-0.03em;color:#171c28}
@@ -3727,13 +3684,7 @@ function invDownloadPDF(id) {
 <div class="sheet">
   <div class="top">
     <div class="brand">
-      <svg class="tile" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-        <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2378be"/><stop offset="1" stop-color="#1e6bae"/></linearGradient></defs>
-        <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#bg)"/>
-        <rect x="16" y="20" width="32" height="6" rx="3" fill="#ffffff"/>
-        <rect x="16" y="30" width="24" height="6" rx="3" fill="#ffffff" opacity="0.82"/>
-        <rect x="16" y="40" width="14" height="6" rx="3" fill="#7cb342"/>
-      </svg>
+      <img class="tile" src="${new URL('img/logo-mark.png', location.href).href}" alt="Kvitli" />
       <div class="logo">Kvit<span>li</span></div>
     </div>
     <div class="inv-meta"><h1>Számla</h1><div class="num">${esc(inv.invoiceNum)}</div></div>
