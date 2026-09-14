@@ -1783,6 +1783,7 @@ function inboxEmbedSnippet() {
       var data = { name: nameV, email: emailV, type: g("type"), key: KEY, status: "uj", price: price, currency: currency, date: new Date().toISOString().slice(0, 10), createdAt: Date.now() };
       if (currency === "EUR") data.fxRate = Number(CFG.eurHuf) || 0;
       if (fc.business) data.clientType = (ctV === t.biz) ? "Vállalkozó" : "Magánszemély";
+      if (fc.business && ctV === t.biz) { if (coV) data.company = coV; if (taxV) data.tax = taxV; }
       if (f.phone)    data.phone = phoneV;
       if (f.budget)   data.budget = budgetV;
       if (f.deadline) data.deadline = deadlineV;
@@ -2937,7 +2938,7 @@ function renderOrders() {
   const rows = [...state.orders].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   tbody.innerHTML =
     rows.length === 0
-      ? '<tr><td colspan="7" style="color:var(--muted)">Még nincs projekt. A megkereséseket a „Megrendelések" fülről alakítsd projektté.</td></tr>'
+      ? '<tr><td colspan="6" style="color:var(--muted)">Még nincs projekt. A megkereséseket a „Megrendelések" fülről alakítsd projektté.</td></tr>'
       : rows
           .map((o) => {
             const st = ORDER_STATUS[o.status] || {
@@ -2948,12 +2949,12 @@ function renderOrders() {
             const late = st.active && o.deadline && o.deadline < today;
             const isTorolve = o.status === 'torolve';
             const isLocked = o.status === 'eles' || o.status === 'torolve';
+            const who = o.clientType === 'Vállalkozó' && o.company ? o.company : o.name;
             return `<tr style="${isTorolve ? 'opacity:0.45' : ''}">
           <td style="font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap">${escHtml(o.num || '—')}</td>
-          <td style="font-weight:600"><span onclick="openOrderDetail('${o.id}')" style="cursor:pointer;color:var(--accent2);text-decoration:underline dotted" title="Projekt részletei">${escHtml(o.name)}</span>${o.topic ? `<div style="color:var(--muted);font-size:11.5px;font-weight:500">${escHtml(o.topic)}</div>` : ''}${o.note ? `<div style="color:var(--muted);font-size:11px;font-weight:400">${escHtml(o.note)}</div>` : ''}</td>
+          <td style="font-weight:600"><span onclick="openOrderDetail('${o.id}')" style="cursor:pointer;color:var(--accent2);text-decoration:underline dotted" title="Projekt részletei">${escHtml(who)}</span></td>
           <td>${o.type}</td>
           <td style="font-weight:600">${isTorolve ? '<span style="color:var(--muted)">' + fmt(orderPriceHuf(o)) + '</span>' : fmt(orderPriceHuf(o))}</td>
-          <td style="white-space:nowrap">${o.date || '—'}</td>
           <td style="white-space:nowrap${late ? ';color:var(--red);font-weight:600' : ''}">${o.deadline || '—'}${late ? ' — lejárt' : ''}</td>
           <td>${isLocked ? `<span class="badge ${st.badge}">${st.label}</span>` : statusSelect(o)}</td>
         </tr>`;
@@ -2996,6 +2997,8 @@ function buildOrderDetailHTML(o) {
     row('Azonosító', escHtml(o.num || '—')) +
     row('Ügyfél', escHtml(o.name || '—')) +
     row('Ügyféltípus', o.clientType ? escHtml(o.clientType) : '') +
+    row('Cég', o.company ? escHtml(o.company) : '') +
+    row('Adószám', o.tax ? escHtml(o.tax) : '') +
     row('E-mail', o.email ? '<a href="mailto:' + escHtml(o.email) + '" style="color:var(--accent2)">' + escHtml(o.email) + '</a>' : '') +
     row('Telefon', o.phone ? escHtml(o.phone) : '') +
     row('Típus', escHtml(o.type || '—')) +

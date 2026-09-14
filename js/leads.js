@@ -311,6 +311,8 @@ function _leadToOrder(lead) {
     email: lead.email,
     phone: lead.phone,
     clientType: lead.clientType,
+    company: lead.company || '',
+    tax: lead.tax || '',
     topic: lead.topic,
     budget: lead.budget,
     currency: lead.currency === 'EUR' ? 'EUR' : 'HUF',
