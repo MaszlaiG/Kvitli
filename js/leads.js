@@ -468,15 +468,19 @@ document.addEventListener('swm:ready', () => {
 function _offerFt(n) {
   return Math.round(Number(n) || 0).toLocaleString('hu-HU') + ' Ft';
 }
-function offerAddRow(desc, qty, price) {
+function offerAddRow(desc, qty, price, recurring) {
   const box = document.getElementById('offer-items');
   if (!box) return;
   const row = document.createElement('div');
   row.className = 'offer-row';
   row.style.cssText =
-    'display:grid;grid-template-columns:1fr 58px 104px 30px;gap:8px;align-items:center;margin-bottom:8px';
+    'display:grid;grid-template-columns:1fr 78px 50px 96px 30px;gap:8px;align-items:center;margin-bottom:8px';
   row.innerHTML =
     '<input type="text" class="of-desc" placeholder="Megnevezés" oninput="offerRecalc()">' +
+    '<select class="of-type" title="Elszámolás" onchange="offerRecalc()" style="padding:0 6px">' +
+    '<option value="once">egyszeri</option>' +
+    '<option value="mo">havi</option>' +
+    '</select>' +
     '<input type="number" class="of-qty" value="' +
     (qty != null ? qty : 1) +
     '" min="0" step="any" oninput="offerRecalc()">' +
@@ -485,22 +489,32 @@ function offerAddRow(desc, qty, price) {
   box.appendChild(row);
   if (desc != null) row.querySelector('.of-desc').value = desc;
   if (price != null) row.querySelector('.of-price').value = price;
+  if (recurring) row.querySelector('.of-type').value = 'mo';
   offerRecalc();
 }
 function _offerRows() {
-  return [...document.querySelectorAll('#offer-items .offer-row')].map((r) => ({
-    desc: (r.querySelector('.of-desc').value || '').trim(),
-    qty: parseFloat(r.querySelector('.of-qty').value) || 0,
-    price: parseFloat(r.querySelector('.of-price').value) || 0
-  }));
+  return [...document.querySelectorAll('#offer-items .offer-row')].map((r) => {
+    const typeEl = r.querySelector('.of-type');
+    return {
+      desc: (r.querySelector('.of-desc').value || '').trim(),
+      qty: parseFloat(r.querySelector('.of-qty').value) || 0,
+      price: parseFloat(r.querySelector('.of-price').value) || 0,
+      recurring: !!(typeEl && typeEl.value === 'mo')
+    };
+  });
 }
 function offerRecalc() {
   const si = state.sellerInfo || {};
   const vatReg = !!si.vatRegistered;
   const vatRate = si.vatRate == null ? 27 : si.vatRate;
-  const net = _offerRows().reduce((s, it) => s + it.qty * it.price, 0);
+  const rows = _offerRows();
+  const net = rows.filter((it) => !it.recurring).reduce((s, it) => s + it.qty * it.price, 0);
+  const netMo = rows.filter((it) => it.recurring).reduce((s, it) => s + it.qty * it.price, 0);
   const vat = vatReg ? (net * vatRate) / 100 : 0;
+  const vatMo = vatReg ? (netMo * vatRate) / 100 : 0;
   const gross = net + vat;
+  const grossMo = netMo + vatMo;
+  const hasMo = rows.some((it) => it.recurring);
   const set = (id, v) => {
     const el = document.getElementById(id);
     if (el) el.textContent = v;
@@ -510,14 +524,28 @@ function offerRecalc() {
   if (vatRow) vatRow.style.display = vatReg ? 'flex' : 'none';
   set('offer-vat-label', 'ÁFA (' + vatRate + '%)');
   set('offer-vat', _offerFt(vat));
-  set('offer-total-label', vatReg ? 'Végösszeg (bruttó)' : 'Végösszeg');
+  set('offer-total-label', hasMo ? (vatReg ? 'Egyszeri díj (bruttó)' : 'Egyszeri díj') : vatReg ? 'Végösszeg (bruttó)' : 'Végösszeg');
   set('offer-total', _offerFt(gross));
+  // Havidíj-blokk
+  const moBlock = document.getElementById('offer-mo-block');
+  if (moBlock) moBlock.style.display = hasMo ? '' : 'none';
+  set('offer-mo-net', _offerFt(netMo) + ' / hó');
+  const moVatRow = document.getElementById('offer-mo-vat-row');
+  if (moVatRow) moVatRow.style.display = vatReg ? 'flex' : 'none';
+  set('offer-mo-vat-label', 'ÁFA (' + vatRate + '%)');
+  set('offer-mo-vat', _offerFt(vatMo) + ' / hó');
+  set('offer-mo-total-label', vatReg ? 'Havidíj (bruttó)' : 'Havidíj');
+  set('offer-mo-total', _offerFt(grossMo) + ' / hó');
   const note = document.getElementById('offer-vat-note');
   if (note) note.value = vatReg ? 'ÁFA-alany · ' + vatRate + '%' : 'Alanyi adómentes (AAM)';
   return {
     net,
     vat,
     gross,
+    netMo,
+    vatMo,
+    grossMo,
+    hasMo,
     vatReg,
     vatRate
   };
@@ -534,7 +562,7 @@ function openOfferModal(id) {
   if (box) box.innerHTML = '';
   const prev = lead.offer;
   if (prev && Array.isArray(prev.items) && prev.items.length) {
-    prev.items.forEach((it) => offerAddRow(it.desc, it.qty, it.price));
+    prev.items.forEach((it) => offerAddRow(it.desc, it.qty, it.price, it.recurring));
   } else {
     const desc = lead.topic || lead.type || 'Szolgáltatás';
     offerAddRow(desc, 1, lead.price || 0);
@@ -577,6 +605,10 @@ function _offerDetailsHtml(items, t, validUntil) {
     'padding:9px 10px;border-bottom:2px solid #171c28;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:' +
     L +
     ';text-align:left';
+  const moTag =
+    '<span style="display:inline-block;margin-left:6px;font-size:10px;font-weight:700;color:' +
+    AC +
+    ';background:#eaf2fb;border-radius:4px;padding:1px 6px;vertical-align:middle">havi</span>';
   let rows = items
     .map(
       (it) =>
@@ -587,6 +619,7 @@ function _offerDetailsHtml(items, t, validUntil) {
         V +
         '">' +
         escHtml(it.desc) +
+        (it.recurring ? moTag : '') +
         '</td>' +
         '<td style="padding:11px 10px;border-bottom:1px solid ' +
         B +
@@ -601,6 +634,7 @@ function _offerDetailsHtml(items, t, validUntil) {
         V +
         ';text-align:right;white-space:nowrap">' +
         _offerFt(it.price) +
+        (it.recurring ? ' / hó' : '') +
         '</td>' +
         '<td style="padding:11px 10px;border-bottom:1px solid ' +
         B +
@@ -608,47 +642,53 @@ function _offerDetailsHtml(items, t, validUntil) {
         V +
         ';text-align:right;white-space:nowrap">' +
         _offerFt(it.qty * it.price) +
+        (it.recurring ? ' / hó' : '') +
         '</td>' +
         '</tr>'
     )
     .join('');
-  let totals =
-    '<tr><td colspan="3" style="padding:8px 10px;text-align:right;font-size:12.5px;color:' +
-    L +
-    '">Nettó összesen</td>' +
-    '<td style="padding:8px 10px;text-align:right;font-size:13px;color:' +
-    V +
-    ';white-space:nowrap">' +
-    _offerFt(t.net) +
-    '</td></tr>';
-  if (t.vatReg) {
-    totals +=
-      '<tr><td colspan="3" style="padding:8px 10px;text-align:right;font-size:12.5px;color:' +
-      L +
-      '">ÁFA (' +
-      t.vatRate +
-      '%)</td>' +
-      '<td style="padding:8px 10px;text-align:right;font-size:13px;color:' +
-      V +
-      ';white-space:nowrap">' +
-      _offerFt(t.vat) +
-      '</td></tr>';
+  const hasMo = !!t.hasMo || items.some((it) => it.recurring);
+  const totRow = (label, value, opt) => {
+    opt = opt || {};
+    return (
+      '<tr><td colspan="3" style="padding:' +
+      (opt.big ? '12px' : '8px') +
+      ' 10px;text-align:right;font-size:' +
+      (opt.big ? '13px;font-weight:800;color:' + V : '12.5px;color:' + L) +
+      (opt.top ? ';border-top:2px solid ' + B : '') +
+      '">' +
+      label +
+      '</td>' +
+      '<td style="padding:' +
+      (opt.big ? '12px' : '8px') +
+      ' 10px;text-align:right;white-space:nowrap;font-size:' +
+      (opt.big ? '17px;font-weight:800;color:' + AC : '13px;color:' + V) +
+      (opt.top ? ';border-top:2px solid ' + B : '') +
+      '">' +
+      value +
+      '</td></tr>'
+    );
+  };
+  let totals = '';
+  const showOnce = !hasMo || t.net || t.gross;
+  if (showOnce) {
+    totals += totRow('Nettó összesen' + (hasMo ? ' (egyszeri)' : ''), _offerFt(t.net));
+    if (t.vatReg) totals += totRow('ÁFA (' + t.vatRate + '%)', _offerFt(t.vat));
+    totals += totRow(
+      hasMo ? (t.vatReg ? 'Egyszeri díj (bruttó)' : 'Egyszeri díj') : t.vatReg ? 'Végösszeg (bruttó)' : 'Végösszeg',
+      _offerFt(t.gross),
+      { big: true, top: true }
+    );
   }
-  totals +=
-    '<tr><td colspan="3" style="padding:12px 10px;text-align:right;font-size:13px;font-weight:800;color:' +
-    V +
-    ';border-top:2px solid ' +
-    B +
-    '">' +
-    (t.vatReg ? 'Végösszeg (bruttó)' : 'Végösszeg') +
-    '</td>' +
-    '<td style="padding:12px 10px;text-align:right;font-size:17px;font-weight:800;color:' +
-    AC +
-    ';border-top:2px solid ' +
-    B +
-    ';white-space:nowrap">' +
-    _offerFt(t.gross) +
-    '</td></tr>';
+  if (hasMo) {
+    totals += totRow('Havi nettó', _offerFt(t.netMo) + ' / hó', { top: !showOnce });
+    if (t.vatReg) totals += totRow('ÁFA (' + t.vatRate + '%)', _offerFt(t.vatMo) + ' / hó');
+    totals += totRow(
+      t.vatReg ? 'Havidíj (bruttó)' : 'Havidíj',
+      _offerFt(t.grossMo) + ' / hó',
+      { big: true, top: true }
+    );
+  }
   const validRow = validUntil
     ? '<tr><td colspan="4" style="padding:14px 10px 0;font-size:12px;color:' +
       L +
@@ -685,7 +725,17 @@ function viewOffer(leadId) {
   const o = lead.offer;
   const details = _offerDetailsHtml(
     o.items,
-    { net: o.net, vat: o.vat, gross: o.gross, vatReg: o.vatReg, vatRate: o.vatRate },
+    {
+      net: o.net,
+      vat: o.vat,
+      gross: o.gross,
+      netMo: o.netMo || 0,
+      vatMo: o.vatMo || 0,
+      grossMo: o.grossMo || 0,
+      hasMo: !!o.grossMo || (Array.isArray(o.items) && o.items.some((it) => it.recurring)),
+      vatReg: o.vatReg,
+      vatRate: o.vatRate
+    },
     o.validUntil || ''
   );
   const si = state.sellerInfo || {};
@@ -772,12 +822,16 @@ async function sendOffer() {
       tax: si.tax || '',
       to: lead.name || '',
       msg: message,
-      items: items.map((it) => ({ d: it.desc, q: it.qty, p: it.price })),
+      items: items.map((it) => ({ d: it.desc, q: it.qty, p: it.price, r: it.recurring ? 1 : 0 })),
       vatReg: t.vatReg,
       vatRate: t.vatRate,
       net: t.net,
       vat: t.vat,
       gross: t.gross,
+      netMo: t.netMo,
+      vatMo: t.vatMo,
+      grossMo: t.grossMo,
+      hasMo: t.hasMo ? 1 : 0,
       valid: validUntil,
       date: new Date().toISOString().slice(0, 10)
     };
@@ -835,6 +889,9 @@ async function sendOffer() {
       net: t.net,
       vat: t.vat,
       gross: t.gross,
+      netMo: t.netMo,
+      vatMo: t.vatMo,
+      grossMo: t.grossMo,
       vatReg: t.vatReg,
       vatRate: t.vatRate,
       sentAt: new Date().toISOString()

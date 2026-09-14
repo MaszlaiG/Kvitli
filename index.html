@@ -1139,7 +1139,7 @@
               <div
                 style="
                   display: grid;
-                  grid-template-columns: 1fr 58px 104px 30px;
+                  grid-template-columns: 1fr 78px 50px 96px 30px;
                   gap: 8px;
                   margin-bottom: 6px;
                   font-size: 10px;
@@ -1148,7 +1148,7 @@
                   letter-spacing: 0.5px;
                 "
               >
-                <span>Megnevezés</span><span>Menny.</span><span>Egységár</span><span></span>
+                <span>Megnevezés</span><span>Típus</span><span>Menny.</span><span>Egységár</span><span></span>
               </div>
               <div id="offer-items"></div>
               <button class="btn btn-secondary btn-sm" onclick="offerAddRow()" style="margin-top: 2px">+ Tétel</button>
@@ -1206,6 +1206,32 @@
                 >
                   <span id="offer-total-label">Végösszeg</span
                   ><span id="offer-total" style="font-variant-numeric: tabular-nums; color: var(--accent)">0 Ft</span>
+                </div>
+                <div id="offer-mo-block" style="display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border)">
+                  <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0">
+                    <span>Havi nettó</span><span id="offer-mo-net" style="font-variant-numeric: tabular-nums">0 Ft / hó</span>
+                  </div>
+                  <div
+                    id="offer-mo-vat-row"
+                    style="display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; color: var(--muted)"
+                  >
+                    <span id="offer-mo-vat-label">ÁFA</span
+                    ><span id="offer-mo-vat" style="font-variant-numeric: tabular-nums">0 Ft / hó</span>
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      font-size: 16px;
+                      font-weight: 800;
+                      padding: 8px 0 0;
+                      border-top: 1px solid var(--border);
+                      margin-top: 4px;
+                    "
+                  >
+                    <span id="offer-mo-total-label">Havidíj</span
+                    ><span id="offer-mo-total" style="font-variant-numeric: tabular-nums; color: var(--accent)">0 Ft / hó</span>
+                  </div>
                 </div>
               </div>
 

@@ -103,16 +103,29 @@
   function render(o){
     var items = Array.isArray(o.items) ? o.items : [];
     var net = Number(o.net)||0, vat = Number(o.vat)||0, gross = Number(o.gross)||0;
+    var netMo = Number(o.netMo)||0, vatMo = Number(o.vatMo)||0, grossMo = Number(o.grossMo)||0;
+    var hasMo = !!o.hasMo || items.some(function(it){ return it.r; });
     var bizMeta = [o.addr, o.tax ? ('Adószám: '+o.tax) : '', o.email, o.phone].filter(Boolean).map(esc).join(' · ');
 
+    var moTag = ' <span style="display:inline-block;margin-left:4px;font-size:10px;font-weight:700;color:var(--blue);background:#eaf2fb;border-radius:4px;padding:1px 6px;vertical-align:middle">havi</span>';
     var rows = items.map(function(it){
-      var q = Number(it.q)||0, p = Number(it.p)||0;
-      return '<tr><td>'+esc(it.d)+'</td><td class="c">'+q+'</td><td class="r">'+ft(p)+'</td><td class="r" style="font-weight:600">'+ft(q*p)+'</td></tr>';
+      var q = Number(it.q)||0, p = Number(it.p)||0, mo = it.r ? ' / hó' : '';
+      return '<tr><td>'+esc(it.d)+(it.r?moTag:'')+'</td><td class="c">'+q+'</td><td class="r">'+ft(p)+mo+'</td><td class="r" style="font-weight:600">'+ft(q*p)+mo+'</td></tr>';
     }).join('');
 
-    var tot = '<tr><td colspan="3" class="tot-lbl">Nettó összesen</td><td class="r">'+ft(net)+'</td></tr>';
-    if(o.vatReg) tot += '<tr><td colspan="3" class="tot-lbl">ÁFA ('+(Number(o.vatRate)||0)+'%)</td><td class="r">'+ft(vat)+'</td></tr>';
-    tot += '<tr class="grand"><td colspan="3" class="tot-lbl">'+(o.vatReg?'Végösszeg (bruttó)':'Végösszeg')+'</td><td class="r sum">'+ft(gross)+'</td></tr>';
+    var vatRate = Number(o.vatRate)||0;
+    var tot = '';
+    var showOnce = !hasMo || net || gross;
+    if(showOnce){
+      tot += '<tr><td colspan="3" class="tot-lbl">Nettó összesen'+(hasMo?' (egyszeri)':'')+'</td><td class="r">'+ft(net)+'</td></tr>';
+      if(o.vatReg) tot += '<tr><td colspan="3" class="tot-lbl">ÁFA ('+vatRate+'%)</td><td class="r">'+ft(vat)+'</td></tr>';
+      tot += '<tr class="grand"><td colspan="3" class="tot-lbl">'+(hasMo?(o.vatReg?'Egyszeri díj (bruttó)':'Egyszeri díj'):(o.vatReg?'Végösszeg (bruttó)':'Végösszeg'))+'</td><td class="r sum">'+ft(gross)+'</td></tr>';
+    }
+    if(hasMo){
+      tot += '<tr'+(showOnce?'':' class="grand"')+'><td colspan="3" class="tot-lbl">Havi nettó</td><td class="r">'+ft(netMo)+' / hó</td></tr>';
+      if(o.vatReg) tot += '<tr><td colspan="3" class="tot-lbl">ÁFA ('+vatRate+'%)</td><td class="r">'+ft(vatMo)+' / hó</td></tr>';
+      tot += '<tr class="grand"><td colspan="3" class="tot-lbl">'+(o.vatReg?'Havidíj (bruttó)':'Havidíj')+'</td><td class="r sum">'+ft(grossMo)+' / hó</td></tr>';
+    }
 
     var validHtml = o.valid ? '<div class="valid">Az ajánlat érvényes: <strong style="color:var(--ink)">'+esc(o.valid)+'</strong>-ig.</div>' : '';
     var msgHtml = o.msg ? '<p class="msg">'+esc(o.msg)+'</p>' : '';
