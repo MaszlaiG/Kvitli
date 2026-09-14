@@ -2885,7 +2885,10 @@ function renderOrders() {
   if (!tbody) return;
   const today = now();
   const year = today.slice(0, 4);
-  const leadsCount = Object.values(state.leads || {}).filter((l) => l.status !== 'atirva').length;
+  const _convertedIds = new Set((state.orders || []).map((o) => o.leadId));
+  const leadsCount = Object.values(state.leads || {}).filter(
+    (l) => l.status !== 'atirva' && l.status !== 'megrendelve' && !_convertedIds.has(l.id)
+  ).length;
   const inProgress = state.orders.filter((o) => o.status === 'folyamatban' || o.status === 'teszt');
   const allThisYear = state.orders.filter((o) => (o.date || '').startsWith(year));
   const withDeadline = state.orders
@@ -2947,7 +2950,7 @@ function renderOrders() {
             const isLocked = o.status === 'eles' || o.status === 'torolve';
             return `<tr style="${isTorolve ? 'opacity:0.45' : ''}">
           <td style="font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap">${escHtml(o.num || '—')}</td>
-          <td style="font-weight:600">${escHtml(o.name)}${o.topic ? `<div style="color:var(--muted);font-size:11.5px;font-weight:500">${escHtml(o.topic)}</div>` : ''}${o.note ? `<div style="color:var(--muted);font-size:11px;font-weight:400">${escHtml(o.note)}</div>` : ''}</td>
+          <td style="font-weight:600"><span onclick="openOrderDetail('${o.id}')" style="cursor:pointer;color:var(--accent2);text-decoration:underline dotted" title="Projekt részletei">${escHtml(o.name)}</span>${o.topic ? `<div style="color:var(--muted);font-size:11.5px;font-weight:500">${escHtml(o.topic)}</div>` : ''}${o.note ? `<div style="color:var(--muted);font-size:11px;font-weight:400">${escHtml(o.note)}</div>` : ''}</td>
           <td>${o.type}</td>
           <td style="font-weight:600">${isTorolve ? '<span style="color:var(--muted)">' + fmt(orderPriceHuf(o)) + '</span>' : fmt(orderPriceHuf(o))}</td>
           <td style="white-space:nowrap">${o.date || '—'}</td>
@@ -2956,6 +2959,114 @@ function renderOrders() {
         </tr>`;
           })
           .join('');
+}
+function openOrderDetail(id) {
+  const o = (state.orders || []).find((x) => x.id === id);
+  if (!o) return;
+  const lv = document.getElementById('orders-list-view');
+  const dv = document.getElementById('order-detail-view');
+  const c = document.getElementById('order-detail-content');
+  if (!lv || !dv || !c) return;
+  c.innerHTML = buildOrderDetailHTML(o);
+  lv.style.display = 'none';
+  dv.style.display = 'block';
+  try {
+    window.scrollTo(0, 0);
+  } catch (e) {}
+}
+function closeOrderDetail() {
+  const lv = document.getElementById('orders-list-view');
+  const dv = document.getElementById('order-detail-view');
+  if (lv) lv.style.display = 'block';
+  if (dv) dv.style.display = 'none';
+}
+function buildOrderDetailHTML(o) {
+  const lead = (state.leads && state.leads[o.leadId]) || null;
+  const st = ORDER_STATUS[o.status] || { label: o.status, badge: 'badge-gray' };
+  const row = (label, val) =>
+    val
+      ? '<div style="display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted);font-size:12.5px">' +
+        escHtml(label) +
+        '</span><span style="font-size:13px;font-weight:600;text-align:right">' +
+        val +
+        '</span></div>'
+      : '';
+  const dataCard =
+    '<div class="card" style="margin-bottom:16px"><div class="card-title" style="margin-bottom:8px">Projekt adatai</div>' +
+    row('Azonosító', escHtml(o.num || '—')) +
+    row('Ügyfél', escHtml(o.name || '—')) +
+    row('Ügyféltípus', o.clientType ? escHtml(o.clientType) : '') +
+    row('E-mail', o.email ? '<a href="mailto:' + escHtml(o.email) + '" style="color:var(--accent2)">' + escHtml(o.email) + '</a>' : '') +
+    row('Telefon', o.phone ? escHtml(o.phone) : '') +
+    row('Típus', escHtml(o.type || '—')) +
+    row('Téma', o.topic ? escHtml(o.topic) : '') +
+    row('Tervezett keret', o.budget && o.budget !== 'Nem megadott' ? escHtml(o.budget) : '') +
+    row('Ár', fmt(orderPriceHuf(o))) +
+    row('Dátum', escHtml(o.date || '—')) +
+    row('Határidő', o.deadline ? escHtml(o.deadline) : '—') +
+    row('Állapot', '<span class="badge ' + (st.badge || 'badge-gray') + '">' + escHtml(st.label) + '</span>') +
+    (o.note ? '<div style="margin-top:10px;color:var(--muted);font-size:12.5px;line-height:1.5">' + escHtml(o.note) + '</div>' : '') +
+    '</div>';
+  let offerCard;
+  if (lead && lead.offer && Array.isArray(lead.offer.items) && lead.offer.items.length) {
+    const of = lead.offer;
+    const t = {
+      net: of.net,
+      vat: of.vat,
+      gross: of.gross,
+      netMo: of.netMo || 0,
+      vatMo: of.vatMo || 0,
+      grossMo: of.grossMo || 0,
+      hasMo: !!of.grossMo || of.items.some((i) => i.recurring),
+      vatReg: of.vatReg,
+      vatRate: of.vatRate
+    };
+    const details = typeof _offerDetailsHtml === 'function' ? _offerDetailsHtml(of.items, t, of.validUntil || '') : '';
+    const statusLine = of.accepted
+      ? '<span class="badge badge-green">Elfogadva</span> ' + escHtml((of.acceptedAt || of.sentAt || '').slice(0, 10))
+      : of.sentAt
+      ? '<span class="badge badge-cyan">Elküldve</span> ' + escHtml((of.sentAt || '').slice(0, 10))
+      : '';
+    offerCard =
+      '<div class="card" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px"><div class="card-title">Árajánlat</div><div style="font-size:12px">' +
+      statusLine +
+      ' · <a onclick="viewOffer(\'' +
+      o.leadId +
+      '\')" style="color:var(--accent2);text-decoration:underline;cursor:pointer">megnyitás</a></div></div>' +
+      details +
+      '</div>';
+  } else {
+    offerCard =
+      '<div class="card" style="margin-bottom:16px"><div class="card-title">Árajánlat</div><div style="color:var(--muted);font-size:13px;margin-top:6px">Ehhez a projekthez nincs rögzített árajánlat.</div></div>';
+  }
+  let contractCard;
+  if (lead && lead.contract && lead.contract.contractId) {
+    const ct = lead.contract;
+    const line = ct.signed
+      ? '<span class="badge badge-green">Aláírva</span> ' +
+        escHtml((ct.signedAt || '').replace('T', ' ').slice(0, 16)) +
+        (ct.signerName ? ' — ' + escHtml(ct.signerName) : '')
+      : '<span class="badge badge-purple">Elküldve</span> ' + escHtml((ct.sentAt || '').slice(0, 10));
+    contractCard =
+      '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px"><div class="card-title">Szerződés</div><div style="font-size:12px"><a onclick="viewSignedContract(\'' +
+      o.leadId +
+      '\')" style="color:var(--accent2);text-decoration:underline;cursor:pointer">megnyitás / PDF</a></div></div>' +
+      '<div style="font-size:13px">' +
+      escHtml(ct.docType || 'Szerződés') +
+      '</div><div style="font-size:12.5px;color:var(--muted);margin-top:4px">' +
+      line +
+      '</div></div>';
+  } else {
+    contractCard =
+      '<div class="card"><div class="card-title">Szerződés</div><div style="color:var(--muted);font-size:13px;margin-top:6px">Ehhez a projekthez nincs rögzített szerződés.</div></div>';
+  }
+  const header =
+    '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;flex-wrap:wrap"><h2 style="margin:0;font-size:20px">' +
+    escHtml(o.name || 'Projekt') +
+    '</h2><span style="font-family:var(--mono);font-size:12px;color:var(--muted)">' +
+    escHtml(o.num || '') +
+    '</span></div>';
+  return header + dataCard + offerCard + contractCard;
 }
 function renderBizDash() {
   const revEl = document.getElementById('bd-rev');

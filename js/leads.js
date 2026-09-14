@@ -348,8 +348,9 @@ function renderLeadsTable() {
   }
   const tbody = document.getElementById('leads-tbody');
   if (!tbody) return;
+  const convertedIds = new Set((state.orders || []).map((o) => o.leadId));
   const leads = Object.values(state.leads)
-    .filter((l) => l.status !== 'atirva')
+    .filter((l) => l.status !== 'atirva' && l.status !== 'megrendelve' && !convertedIds.has(l.id))
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   if (!leads.length) {
     tbody.innerHTML =
@@ -455,6 +456,10 @@ window.showTab = function (id) {
   if (id === 'orders') {
     renderLeadsTable();
     updateLeadBadge();
+  }
+  if (id === 'projects') {
+    if (typeof closeOrderDetail === 'function') closeOrderDetail();
+    if (typeof renderOrders === 'function') renderOrders();
   }
 };
 document.addEventListener('swm:ready', () => {

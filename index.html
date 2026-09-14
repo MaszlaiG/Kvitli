@@ -676,6 +676,7 @@
           </div>
 
           <div class="tab-content" id="tab-projects">
+            <div id="orders-list-view">
             <div class="grid g3" style="margin-bottom: 16px">
               <div class="card card-stat-yellow">
                 <div class="card-title">Folyamatban lévő projektek</div>
@@ -719,6 +720,14 @@
                   </tbody>
                 </table>
               </div>
+            </div>
+            </div>
+
+            <div id="order-detail-view" style="display: none">
+              <div style="margin-bottom: 12px">
+                <button class="btn btn-secondary" onclick="closeOrderDetail()">← Vissza a projektekhez</button>
+              </div>
+              <div id="order-detail-content"></div>
             </div>
           </div>
 
