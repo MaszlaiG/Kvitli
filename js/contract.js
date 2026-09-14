@@ -254,12 +254,10 @@ function _cityOf(addr) {
 }
 function _signaturesBlock(ctx, roles) {
   const hely = _cityOf(ctx.m.cim) || '[hely]';
-  const si = (typeof state !== 'undefined' && state.sellerInfo) || {};
-  const providerSig = si.signaturePng
-    ? '<div style="height:64px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden"><img src="' +
-      si.signaturePng +
-      '" alt="aláírás" style="max-height:60px;max-width:92%"></div>'
-    : '<div style="height:64px"></div>';
+  // Üres helyőrző a vállalkozó aláírásának — a képet később a _injectOwnerSig illeszti be
+  // (a tárolt/nyomtatott verzióba), hogy az e-mailbe küldött HTML az 50KB limit alatt maradjon.
+  const providerSig =
+    '<div class="rendli-sig-owner" style="height:64px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden"></div>';
   return (
     '<div style="page-break-inside:avoid;break-inside:avoid;margin-top:44px">' +
     '<div style="display:flex;justify-content:space-between;gap:40px">' +
@@ -288,6 +286,18 @@ function _signaturesBlock(ctx, roles) {
     '<div class="rendli-sign-stamp"></div>' +
     '</div>'
   );
+}
+
+// Beilleszti a vállalkozó (te) aláírás-képét a szerződés HTML "rendli-sig-owner" helyőrzőjébe.
+// Csak a tárolt/nyomtatott verzióba tesszük, az e-mailbe küldöttbe NEM (50KB-os EmailJS limit).
+function _injectOwnerSig(html) {
+  const si = (typeof state !== 'undefined' && state.sellerInfo) || {};
+  if (!si.signaturePng || !html) return html;
+  const slot =
+    '<div class="rendli-sig-owner" style="height:64px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden">';
+  const img =
+    '<img src="' + si.signaturePng + '" alt="aláírás" style="max-height:60px;max-width:92%">';
+  return html.indexOf(slot) >= 0 ? html.replace(slot, slot + img) : html;
 }
 
 function _appendix(title, bodyHtml) {
@@ -1182,7 +1192,7 @@ function buildContractDoc(ctx, tplId) {
     '<button class="print-btn" onclick="window.print()">Nyomtatás / Mentés PDF-ként</button>' +
     '<div class="edit-hint">✎ Ez a nézet <strong>szerkeszthető</strong>: kattints bárhová, és írd át a szöveget vagy a [ ] részeket, mielőtt nyomtatsz / PDF-be mentesz. (A módosítás csak ebben az ablakban él, a Kvitlibe nem mentődik vissza.)</div>' +
     '<div id="doc" contenteditable="true">' +
-    buildContractInner(ctx, tpl.id) +
+    _injectOwnerSig(buildContractInner(ctx, tpl.id)) +
     '</div>' +
     '</body></html>'
   );
@@ -1330,6 +1340,10 @@ async function sendContract() {
   const bizName = si.name || 'Kvitli';
   const ownerMail = si.email || (LocalStore.currentUser && LocalStore.currentUser.email) || '';
   const details = buildContractInner(ctx, tplId, { forClient: true });
+  // A tárolt (Firestore) verzióba bekerül a vállalkozó aláírása; az e-mailbe küldött `details`-be NEM,
+  // hogy az EmailJS 50KB-os template_params limitje alatt maradjunk. A megrendelő az online oldalon
+  // (szerzodes.html, a Firestore-ból) és a letöltött PDF-ben látja a te aláírásod.
+  const storedHtml = _injectOwnerSig(details);
   const btn = document.getElementById('contract-send-btn');
   if (btn) btn.disabled = true;
   setNote('Küldés folyamatban…', false);
@@ -1345,7 +1359,7 @@ async function sendContract() {
       .collection('docs')
       .doc(contractId)
       .set({
-        html: details,
+        html: storedHtml,
         docType: tpl.docType,
         bizName: bizName,
         ownerEmail: ownerMail,

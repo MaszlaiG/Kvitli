@@ -1493,7 +1493,14 @@ function initSellerSignPad() {
       return !dirty;
     },
     png: function () {
-      return canvas.toDataURL('image/png');
+      // Lekicsinyítés (max 360px széles), hogy a tárolt aláírás kis méretű maradjon
+      const maxW = 360;
+      const scale = Math.min(1, maxW / canvas.width);
+      const oc = document.createElement('canvas');
+      oc.width = Math.max(1, Math.round(canvas.width * scale));
+      oc.height = Math.max(1, Math.round(canvas.height * scale));
+      oc.getContext('2d').drawImage(canvas, 0, 0, oc.width, oc.height);
+      return oc.toDataURL('image/png');
     },
     load: function (dataUrl) {
       const img = new Image();
