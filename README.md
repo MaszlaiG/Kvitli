@@ -2,12 +2,13 @@
 
 **Language / Nyelv:** [English](#english) · [Magyar](#magyar)
 
-**🌐 Live / Élő oldal:** <https://maszlaig.github.io/Kvitli/>
 **📄 Részletes tervdokumentáció / Full design doc:** [`dokumentumok/`](dokumentumok/) (PDF, HU + EN)
 
 ---
 
 ## English
+
+**🌐 Live site:** <https://maszlaig.github.io/Kvitli/>
 
 **Kvitli** is an account-based **business manager** web app for freelancers and small businesses — leads, orders, projects, clients, invoices, contracts, income/expenses in one place, plus an **embeddable order form** whose submissions appear automatically. Data is stored per account in **Firebase** (Auth + Firestore). No build step, no framework: plain HTML/CSS/JS. Bilingual (HU/EN), light/dark/auto "Studio" design.
 
@@ -24,6 +25,8 @@ Setup notes: `dokumentumok/BEALLITAS-Firebase.txt`, `dokumentumok/BEALLITAS-Emai
 ---
 
 ## Magyar
+
+**🌐 Élő oldal:** <https://maszlaig.github.io/Kvitli/>
 
 A **Kvitli** fiók-alapú **vállalkozáskezelő** webapp szabadúszóknak és kisvállalkozásoknak — megkeresések, megrendelések, projektek, ügyfelek, számlák, szerződések, bevétel/kiadás egy helyen, plusz egy **beágyazható megrendelő-űrlap**, amelynek leadásai automatikusan megjelennek. Az adat fiókonként a **Firebase**-ben (Auth + Firestore). Nincs build lépés, nincs keretrendszer: tiszta HTML/CSS/JS. Kétnyelvű (HU/EN), világos/sötét/auto „Stúdió" dizájn.
 
