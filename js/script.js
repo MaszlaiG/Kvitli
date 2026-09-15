@@ -935,26 +935,32 @@ function recurringDue(o) {
   const shouldExist = Math.min(term, 1 + _monthAnnivCount(o.recurring.startDate));
   return Math.max(0, shouldExist - (o.recurring.monthsBilled || 1));
 }
-function invIssueRecurring(orderId) {
-  const o = (state.orders || []).find((x) => x.id === orderId);
-  if (!o || !o.recurring || recurringDue(o) < 1) return;
-  const monthNo = (o.recurring.monthsBilled || 1) + 1;
-  const s = new Date(o.recurring.startDate);
-  const d = new Date(s.getFullYear(), s.getMonth() + (monthNo - 1), 1);
+// Egy havidíj-számla objektum a k. hónapra (a tétel a megnevezés + periódus, egység "db")
+function _recurringInvoiceFor(o, monthNo) {
+  if (!o || !o.recurring) return null;
+  const activeItems = o.recurring.items.filter((it) => (it.months || 1) >= monthNo);
+  if (!activeItems.length) return null;
+  const _ymd = (dt) =>
+    dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+  const parts = String(o.recurring.startDate).split('-').map(Number);
+  const sy = parts[0],
+    sm = parts[1] || 1,
+    sd = parts[2] || 1;
+  const d = new Date(sy, sm - 1 + (monthNo - 1), 1);
   const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-  d.setDate(Math.min(s.getDate(), lastDay));
-  const issueDate = d.toISOString().slice(0, 10);
+  d.setDate(Math.min(sd, lastDay));
+  const issueDate = _ymd(d);
   const dueD = new Date(d);
   dueD.setDate(dueD.getDate() + 8);
   const ym = issueDate.slice(0, 7);
   const si = state.sellerInfo || {};
   const invCurrency = o.currency === 'EUR' ? 'EUR' : 'HUF';
-  const inv = {
+  return {
     id: uid(),
     orderId: o.id,
     invoiceNum: o.num + '/' + String(monthNo).padStart(2, '0'),
     issueDate,
-    dueDate: dueD.toISOString().slice(0, 10),
+    dueDate: _ymd(dueD),
     sellerName: si.name || '',
     sellerAddress: si.address || '',
     sellerTax: si.tax || '',
@@ -965,14 +971,13 @@ function invIssueRecurring(orderId) {
     buyerName: o.recurring.buyerName || o.name || '',
     buyerAddress: o.recurring.buyerAddress || '',
     buyerTax: o.recurring.buyerTax || '',
-    items: o.recurring.items
-      .filter((it) => (it.months || 1) >= monthNo)
-      .map((it) => ({
-        desc: it.desc + ' – havidíj (' + ym + ', ' + monthNo + '/' + (it.months || 1) + '. hó)',
-        qty: 1,
-        unit: 'hó',
-        unitPrice: it.unitPrice || 0
-      })),
+    buyerEmail: o.recurring.buyerEmail || o.email || '',
+    items: activeItems.map((it) => ({
+      desc: it.desc + ' (' + ym + ')',
+      qty: 1,
+      unit: 'db',
+      unitPrice: it.unitPrice || 0
+    })),
     currency: invCurrency,
     fxRate: invCurrency === 'EUR' ? Number(o.fxRate) || eurHufRate() : 0,
     vatRegistered: !!si.vatRegistered,
@@ -982,12 +987,19 @@ function invIssueRecurring(orderId) {
     paidDate: '',
     recurringMonth: monthNo
   };
+}
+function invIssueRecurring(orderId) {
+  const o = (state.orders || []).find((x) => x.id === orderId);
+  if (!o || !o.recurring || recurringDue(o) < 1) return;
+  const monthNo = (o.recurring.monthsBilled || 1) + 1;
+  const inv = _recurringInvoiceFor(o, monthNo);
+  if (!inv) return;
   if (!state.invoices) state.invoices = [];
   state.invoices.push(inv);
   o.recurring.monthsBilled = monthNo;
   save();
   renderInvoices();
-  uiAlert('Havidíj-számla kiállítva: ' + inv.invoiceNum + ' (' + ym + ')', { title: 'Havi számla' });
+  uiAlert('Havidíj-számla kiállítva: ' + inv.invoiceNum, { title: 'Havi számla' });
 }
 const FX_FALLBACK_EUR_HUF = 400;
 function eurHufRate() {
@@ -1615,8 +1627,20 @@ const EMAILJS_CFG = {
   offerPublicKey: 'VW5KUMRIxcbu5f_h9',
   offerServiceId: 'service_zwzr5l9',
   templateOffer: 'template_ajanlat',
-  templateContract: 'template_szerzodes'
+  templateContract: 'template_szerzodes',
+  // Fiók C (számla) — ingyenes csomagnál fiókonként max 2 sablon, ezért a számlának új fiók/kulcsok kellenek
+  invoicePublicKey: 'EMAILJS_INVOICE_PUBLIC',
+  invoiceServiceId: 'EMAILJS_INVOICE_SERVICE',
+  templateInvoice: 'template_szamla'
 };
+function invoiceEmailReady() {
+  const c = EMAILJS_CFG;
+  return (
+    !!(c.invoicePublicKey && c.invoiceServiceId && c.templateInvoice) &&
+    [c.invoicePublicKey, c.invoiceServiceId, c.templateInvoice].join('|').indexOf('EMAILJS_') < 0 &&
+    (c.templateInvoice || '').indexOf('_ID') < 0
+  );
+}
 function emailjsReady() {
   const c = EMAILJS_CFG;
   return (
@@ -1624,18 +1648,19 @@ function emailjsReady() {
     [c.offerPublicKey, c.offerServiceId].join('|').indexOf('EMAILJS_') < 0
   );
 }
-function emailjsSend(templateId, params) {
+function emailjsSend(templateId, params, opts) {
   if (!templateId || templateId.indexOf('_ID') >= 0)
     return Promise.reject(new Error('Nincs beállítva a sablon azonosítója (EMAILJS_CFG).'));
+  opts = opts || {};
   return fetch('https://api.emailjs.com/api/v1.0/email/send', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      service_id: EMAILJS_CFG.offerServiceId,
+      service_id: opts.serviceId || EMAILJS_CFG.offerServiceId,
       template_id: templateId,
-      user_id: EMAILJS_CFG.offerPublicKey,
+      user_id: opts.publicKey || EMAILJS_CFG.offerPublicKey,
       template_params: params
     })
   }).then((r) => {
@@ -3489,9 +3514,9 @@ function invOpen(orderId) {
         if (it.recurring) {
           const months = it.qty || 1; // havi tételnél a mennyiség = hány hónapig fut
           return {
-            desc: it.desc + ' (havidíj – 1. hó / ' + months + ')',
+            desc: it.desc,
             qty: 1,
-            unit: 'hó',
+            unit: 'db',
             unitPrice: it.price || 0,
             recurring: true,
             months: months
@@ -3588,9 +3613,9 @@ function invSave() {
   const invItems =
     _invItems && _invItems.length
       ? _invItems.map((it) => ({
-          desc: it.desc,
+          desc: it.recurring ? it.desc + ' (' + issueDate.slice(0, 7) + ')' : it.desc,
           qty: it.qty || 1,
-          unit: it.unit || 'db',
+          unit: 'db',
           unitPrice: it.unitPrice || 0
         }))
       : [{ desc: itemDesc, qty: itemQty, unit: itemUnit, unitPrice: itemPrice }];
@@ -3600,9 +3625,9 @@ function invSave() {
       items: _invItems
         .filter((it) => it.recurring)
         .map((it) => ({
-          desc: (it.desc || '').replace(/\s*\(havidíj.*?\)\s*$/, ''),
+          desc: it.desc,
           qty: 1,
-          unit: 'hó',
+          unit: 'db',
           unitPrice: it.unitPrice || 0,
           months: it.months || 1
         })),
@@ -3610,7 +3635,8 @@ function invSave() {
       monthsBilled: 1,
       buyerName: buyerName,
       buyerAddress: buyerAddr,
-      buyerTax: buyerTax
+      buyerTax: buyerTax,
+      buyerEmail: (linkedOrder && linkedOrder.email) || ''
     };
   }
   const inv = {
@@ -3629,6 +3655,7 @@ function invSave() {
     buyerName,
     buyerAddress: buyerAddr,
     buyerTax,
+    buyerEmail: (linkedOrder && linkedOrder.email) || '',
     items: invItems,
     currency: invCurrency,
     fxRate: invFxRate,
@@ -3640,9 +3667,27 @@ function invSave() {
   };
   if (!state.invoices) state.invoices = [];
   state.invoices.push(inv);
+  // Havidíj: az összes hátralévő havi számlát előre legeneráljuk (2. hónaptól a futásidő végéig)
+  let preGen = 0;
+  if (linkedOrder && linkedOrder.recurring) {
+    const term = recurringTerm(linkedOrder);
+    for (let k = 2; k <= term; k++) {
+      const rInv = _recurringInvoiceFor(linkedOrder, k);
+      if (rInv) {
+        state.invoices.push(rInv);
+        preGen++;
+      }
+    }
+    linkedOrder.recurring.monthsBilled = term;
+  }
   save();
   closeModal('invoice-modal');
   renderInvoices();
+  if (preGen > 0) {
+    uiAlert('A számlát kiállítottuk, és a havidíjból ' + preGen + ' további havi számlát előre legeneráltunk.', {
+      title: 'Számla kiállítva'
+    });
+  }
 }
 function invMarkPaid(id) {
   const inv = (state.invoices || []).find((x) => x.id === id);
@@ -3736,7 +3781,6 @@ function renderInvoices() {
   const unpaidTbody = document.getElementById('invoices-unpaid-tbody');
   const paidTbody = document.getElementById('invoices-paid-tbody');
   if (!unpaidTbody || !paidTbody) return;
-  const sorted = [...allInv].sort((a, b) => (b.issueDate || '').localeCompare(a.issueDate || ''));
   const renderRow = (inv) => {
     const order = (state.orders || []).find((o) => o.id === inv.orderId);
     const total = invTotal(inv);
@@ -3755,20 +3799,233 @@ function renderInvoices() {
       <td>${statusBadge}</td>
       <td>
         <div class="row-actions">
+          <button class="btn btn-secondary btn-sm" onclick="invEmail('${inv.id}')">✉ E-mail</button>
           <button class="btn btn-secondary btn-sm" onclick="invDownloadPDF('${inv.id}')">📄 PDF</button>
           ${!inv.paid ? `<button class="btn btn-sm" style="background:var(--accent);border-color:var(--accent);color:#fff" onclick="invMarkPaid('${inv.id}')">✓ Fizetve</button>` : ''}
         </div>
       </td>
     </tr>`;
   };
-  const unpaid = sorted.filter((i) => !i.paid);
-  const paid = sorted.filter((i) => i.paid);
-  unpaidTbody.innerHTML = unpaid.length
-    ? unpaid.map(renderRow).join('')
+  const groupRow = (base, list) => {
+    const parent = list.find((i) => _invGroupBase(i.invoiceNum) === i.invoiceNum) || list[0];
+    const order = (state.orders || []).find((o) => o.id === parent.orderId);
+    const total = list.reduce((s, i) => s + invTotal(i), 0);
+    const paidCount = list.filter((i) => i.paid).length;
+    const allPaid = paidCount === list.length;
+    const anyOverdue = list.some((i) => !i.paid && i.dueDate && i.dueDate < now());
+    const statusBadge = allPaid
+      ? '<span class="badge badge-green">Mind fizetve</span>'
+      : `<span class="badge ${anyOverdue ? 'badge-red' : 'badge-yellow'}">${paidCount}/${list.length} fizetve</span>`;
+    const dates = list.map((i) => i.issueDate).filter(Boolean).sort();
+    const dateRange = dates.length ? dates[0] + ' → ' + dates[dates.length - 1] : '—';
+    return `<tr>
+      <td style="font-family:var(--mono);font-size:12px;font-weight:600"><span onclick="openInvoiceGroup('${base}')" style="cursor:pointer;color:var(--accent2);text-decoration:underline dotted">${escHtml(base)}</span><div style="font-size:10px;color:var(--muted)">+${list.length} számla (havidíj)</div></td>
+      <td style="font-size:11.5px">${dateRange}</td>
+      <td style="font-weight:600">${escHtml(parent.buyerName)}</td>
+      <td style="color:var(--muted);font-size:11.5px">${order ? escHtml(order.name) : '—'}</td>
+      <td style="font-weight:700">${fmt(total)}</td>
+      <td>${statusBadge}</td>
+      <td><div class="row-actions"><button class="btn btn-secondary btn-sm" onclick="openInvoiceGroup('${base}')">Részletek</button></div></td>
+    </tr>`;
+  };
+  // Csoportosítás: a havidíj-számlák a fő (base) számla alá
+  const groups = {};
+  allInv.forEach((iv) => {
+    const base = _invGroupBase(iv.invoiceNum);
+    (groups[base] = groups[base] || []).push(iv);
+  });
+  const units = Object.keys(groups).map((base) => {
+    const list = groups[base].slice().sort((a, b) => String(a.invoiceNum).localeCompare(String(b.invoiceNum)));
+    return { base, list, isGroup: list.length > 1 };
+  });
+  const unitDate = (u) => u.list.map((i) => i.issueDate || '').sort().slice(-1)[0] || '';
+  const rowFor = (u) => (u.isGroup ? groupRow(u.base, u.list) : renderRow(u.list[0]));
+  const unpaidUnits = units
+    .filter((u) => u.list.some((i) => !i.paid))
+    .sort((a, b) => unitDate(b).localeCompare(unitDate(a)));
+  const paidUnits = units
+    .filter((u) => u.list.every((i) => i.paid))
+    .sort((a, b) => unitDate(b).localeCompare(unitDate(a)));
+  unpaidTbody.innerHTML = unpaidUnits.length
+    ? unpaidUnits.map(rowFor).join('')
     : '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:24px">Nincs függőben lévő számla.</td></tr>';
-  paidTbody.innerHTML = paid.length
-    ? paid.map(renderRow).join('')
+  paidTbody.innerHTML = paidUnits.length
+    ? paidUnits.map(rowFor).join('')
     : '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:24px">Még nincs kifizetett számla.</td></tr>';
+}
+function _invGroupBase(num) {
+  // A havi utótag pontosan 2 jegyű (/02 … /12); a rendelés sorszáma 3 jegyű (/001), azt NEM vágjuk
+  return String(num || '').replace(/\/\d{2}$/, '');
+}
+function openInvoiceGroup(base) {
+  const list = (state.invoices || [])
+    .filter((iv) => _invGroupBase(iv.invoiceNum) === base)
+    .sort((a, b) => String(a.invoiceNum).localeCompare(String(b.invoiceNum)));
+  if (!list.length) return;
+  const lv = document.getElementById('invoices-list-view');
+  const dv = document.getElementById('invoice-detail-view');
+  const c = document.getElementById('invoice-detail-content');
+  if (!lv || !dv || !c) return;
+  c.innerHTML = buildInvoiceGroupHTML(base, list);
+  lv.style.display = 'none';
+  dv.style.display = 'block';
+  try {
+    window.scrollTo(0, 0);
+  } catch (e) {}
+}
+function closeInvoiceGroup() {
+  const lv = document.getElementById('invoices-list-view');
+  const dv = document.getElementById('invoice-detail-view');
+  if (lv) lv.style.display = 'block';
+  if (dv) dv.style.display = 'none';
+  renderInvoices();
+}
+function invMarkPaidInGroup(id, base) {
+  invMarkPaid(id);
+  openInvoiceGroup(base);
+}
+function buildInvoiceGroupHTML(base, list) {
+  const parent = list.find((i) => _invGroupBase(i.invoiceNum) === i.invoiceNum) || list[0];
+  const order = (state.orders || []).find((o) => o.id === parent.orderId);
+  const total = list.reduce((s, i) => s + invTotal(i), 0);
+  const paidCount = list.filter((i) => i.paid).length;
+  const rows = list
+    .map((iv) => {
+      const overdue = !iv.paid && iv.dueDate && iv.dueDate < now();
+      const badge = iv.paid
+        ? '<span class="badge badge-green">Fizetve</span>'
+        : overdue
+          ? '<span class="badge badge-red">Lejárt</span>'
+          : '<span class="badge badge-yellow">Függőben</span>';
+      return `<tr>
+        <td style="font-family:var(--mono);font-size:12px;font-weight:600">${escHtml(iv.invoiceNum)}</td>
+        <td>${iv.issueDate || '—'}</td>
+        <td style="color:var(--muted);font-size:11.5px">hat: ${iv.dueDate || '—'}</td>
+        <td style="font-weight:700">${fmt(invTotal(iv))}</td>
+        <td>${badge}</td>
+        <td><div class="row-actions"><button class="btn btn-secondary btn-sm" onclick="invEmail('${iv.id}')">✉ E-mail</button><button class="btn btn-secondary btn-sm" onclick="invDownloadPDF('${iv.id}')">📄 PDF</button>${!iv.paid ? `<button class="btn btn-sm" style="background:var(--accent);border-color:var(--accent);color:#fff" onclick="invMarkPaidInGroup('${iv.id}','${base}')">✓ Fizetve</button>` : ''}</div></td>
+      </tr>`;
+    })
+    .join('');
+  return (
+    '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px;flex-wrap:wrap"><h2 style="margin:0;font-size:20px;font-family:var(--mono)">' +
+    escHtml(base) +
+    '</h2><span class="badge badge-cyan">' +
+    list.length +
+    ' számla</span></div>' +
+    '<div style="color:var(--muted);font-size:12.5px;margin-bottom:14px">' +
+    escHtml(parent.buyerName || '') +
+    (order ? ' · ' + escHtml(order.name) : '') +
+    ' · Összesen: <strong>' +
+    fmt(total) +
+    '</strong> · ' +
+    paidCount +
+    '/' +
+    list.length +
+    ' fizetve</div>' +
+    '<div class="card"><div class="scroll-table"><table><thead><tr><th>Számlaszám</th><th>Kiállítva</th><th>Határidő</th><th>Összeg</th><th>Állapot</th><th></th></tr></thead><tbody>' +
+    rows +
+    '</tbody></table></div></div>'
+  );
+}
+function _invoiceEmailDetailsHtml(inv) {
+  const B = '#e4eaf5',
+    L = '#5d6b85',
+    V = '#171c28',
+    AC = '#2378be';
+  const net = invTotal(inv);
+  const vatReg = !!inv.vatRegistered;
+  const vatRate = Number(inv.vatRate) || 27;
+  const vat = vatReg ? Math.round((net * vatRate) / 100) : 0;
+  const gross = net + vat;
+  const cur = inv.currency === 'EUR' ? 'EUR' : 'HUF';
+  const money = (n) =>
+    cur === 'EUR'
+      ? '€' + Math.round(n).toLocaleString('hu-HU', { useGrouping: true })
+      : Math.round(n).toLocaleString('hu-HU', { useGrouping: true }) + ' Ft';
+  const th =
+    'padding:8px 10px;border-bottom:2px solid #171c28;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:' +
+    L +
+    ';text-align:left';
+  const td = 'padding:10px;border-bottom:1px solid ' + B + ';font-size:13px;color:' + V + '';
+  const rows = (inv.items || [])
+    .map(
+      (it) =>
+        '<tr>' +
+        '<td style="' + td + '">' + escHtml(it.desc) + '</td>' +
+        '<td style="' + td + ';text-align:center;white-space:nowrap">' + it.qty + ' ' + escHtml(it.unit || 'db') + '</td>' +
+        '<td style="' + td + ';text-align:right;white-space:nowrap">' + money(it.unitPrice) + '</td>' +
+        '<td style="' + td + ';font-weight:600;text-align:right;white-space:nowrap">' + money((it.qty || 1) * (it.unitPrice || 0)) + '</td>' +
+        '</tr>'
+    )
+    .join('');
+  let totals = '';
+  if (vatReg) {
+    totals +=
+      '<tr><td colspan="3" style="padding:8px 10px;text-align:right;font-size:12.5px;color:' + L + '">Nettó összesen</td><td style="padding:8px 10px;text-align:right;font-size:13px;color:' + V + ';white-space:nowrap">' + money(net) + '</td></tr>';
+    totals +=
+      '<tr><td colspan="3" style="padding:8px 10px;text-align:right;font-size:12.5px;color:' + L + '">ÁFA (' + vatRate + '%)</td><td style="padding:8px 10px;text-align:right;font-size:13px;color:' + V + ';white-space:nowrap">' + money(vat) + '</td></tr>';
+  }
+  totals +=
+    '<tr><td colspan="3" style="padding:12px 10px;text-align:right;font-size:13px;font-weight:800;color:' + V + ';border-top:2px solid ' + B + '">' + (vatReg ? 'Fizetendő (bruttó)' : 'Fizetendő') + '</td><td style="padding:12px 10px;text-align:right;font-size:17px;font-weight:800;color:' + AC + ';border-top:2px solid ' + B + ';white-space:nowrap">' + money(gross) + '</td></tr>';
+  const meta =
+    '<div style="font-size:12.5px;color:' + L + ';line-height:1.7;margin:0 0 14px">' +
+    '<strong style="color:' + V + '">Számlaszám:</strong> ' + escHtml(inv.invoiceNum || '') + '<br>' +
+    '<strong style="color:' + V + '">Kiállítás:</strong> ' + escHtml(inv.issueDate || '') + ' · <strong style="color:' + V + '">Fizetési határidő:</strong> ' + escHtml(inv.dueDate || '') +
+    (inv.buyerName ? '<br><strong style="color:' + V + '">Vevő:</strong> ' + escHtml(inv.buyerName) + (inv.buyerTax ? ' · Adószám: ' + escHtml(inv.buyerTax) : '') : '') +
+    '</div>';
+  return (
+    meta +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">' +
+    '<thead><tr><th style="' + th + '">Tétel</th><th style="' + th + ';text-align:center">Menny.</th><th style="' + th + ';text-align:right">Egységár</th><th style="' + th + ';text-align:right">Összeg</th></tr></thead>' +
+    '<tbody>' + rows + totals + '</tbody></table>'
+  );
+}
+function invEmail(id) {
+  const inv = (state.invoices || []).find((x) => x.id === id);
+  if (!inv) return;
+  const order = (state.orders || []).find((o) => o.id === inv.orderId);
+  const to = inv.buyerEmail || (order && order.email) || '';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(to).trim())) {
+    uiAlert('Ehhez a számlához nincs érvényes vevő e-mail cím. (A megrendelésnél add meg a vevő e-mail címét.)', {
+      title: 'Nincs e-mail cím'
+    });
+    return;
+  }
+  if (!invoiceEmailReady()) {
+    uiAlert('A számla e-mailes küldése még nincs beállítva (EmailJS). Lásd: dokumentumok/BEALLITAS-EmailJS.txt', {
+      title: 'EmailJS beállítás hiányzik'
+    });
+    return;
+  }
+  const si = state.sellerInfo || {};
+  const bizName = inv.sellerName || si.name || 'Kvitli';
+  const params = {
+    to_email: String(to).trim(),
+    to_name: inv.buyerName || '',
+    from_name: bizName,
+    brand_initial: (bizName.trim()[0] || 'K').toUpperCase(),
+    tagline: 'Számla',
+    reply_to: si.email || inv.sellerEmail || '',
+    subject: 'Számla ' + inv.invoiceNum + ' – ' + bizName,
+    heading: 'Számla',
+    intro:
+      'Mellékeljük a(z) ' + inv.invoiceNum + ' számú számlát. Fizetési határidő: ' + (inv.dueDate || '') + '.',
+    details: _invoiceEmailDetailsHtml(inv)
+  };
+  emailjsSend(EMAILJS_CFG.templateInvoice, params, {
+    serviceId: EMAILJS_CFG.invoiceServiceId,
+    publicKey: EMAILJS_CFG.invoicePublicKey
+  })
+    .then(() => {
+      inv.emailedAt = new Date().toISOString();
+      save();
+      renderInvoices();
+      uiAlert('A számlát elküldtük e-mailben: ' + String(to).trim(), { title: 'Számla elküldve' });
+    })
+    .catch((err) => {
+      uiAlert('A küldés nem sikerült: ' + ((err && err.message) || 'ismeretlen hiba') + '.', { title: 'Hiba' });
+    });
 }
 function invDownloadPDF(id) {
   const inv = (state.invoices || []).find((x) => x.id === id);

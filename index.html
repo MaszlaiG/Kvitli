@@ -885,6 +885,7 @@
           </div>
 
           <div class="tab-content" id="tab-invoices">
+            <div id="invoices-list-view">
             <div class="grid g4" style="margin-bottom: 16px">
               <div class="card card-stat-purple">
                 <div class="card-title">Összes számla</div>
@@ -970,6 +971,14 @@
                   </tbody>
                 </table>
               </div>
+            </div>
+            </div>
+
+            <div id="invoice-detail-view" style="display: none">
+              <div style="margin-bottom: 12px">
+                <button class="btn btn-secondary" onclick="closeInvoiceGroup()">← Vissza a számlákhoz</button>
+              </div>
+              <div id="invoice-detail-content"></div>
             </div>
 
             <div class="modal" id="invoice-modal" onclick="if(event.target===this)closeModal('invoice-modal')">
@@ -1170,7 +1179,8 @@
               <button class="btn btn-secondary btn-sm" onclick="offerAddRow()" style="margin-top: 2px">+ Tétel</button>
               <div style="font-size: 11px; color: var(--muted); margin-top: 6px">
                 Havi tételnél a <strong>mennyiség = hány hónapig fut</strong> (pl. 12 = 12 hónapon át havi díj). Az első
-                számlára az 1. hónap kerül, majd havonta ismétlődik a megadott hónapszámig.
+                számla kiállításakor mind a megadott számú havi számla <strong>előre legenerálódik</strong> (havonta,
+                ugyanazon a napon), a futásidő végéig.
               </div>
 
               <div class="divider" style="margin: 16px 0"></div>

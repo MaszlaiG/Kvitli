@@ -64,10 +64,13 @@ LÉPÉSEK
    Nyisd meg: js/script.js, keresd meg az EMAILJS_CFG blokkot (kb. az
    1435. sor).
 
-   FONTOS: KÉT EmailJS-FIÓK van, mert az ingyenes csomag fiókonként max
+   FONTOS: HÁROM EmailJS-FIÓK van, mert az ingyenes csomag fiókonként max
    2 sablont enged:
      • Fiók A → a beágyazott űrlap visszaigazolói: MEGRENDELŐ + TULAJ
      • Fiók B → az appból küldött ÁRAJÁNLAT + SZERZŐDÉS (offer* kulcsok)
+     • Fiók C → a SZÁMLA e-mail (invoice* kulcsok) — A és B már tele van
+       (2-2 sablon), ezért a számlának ÚJ ingyenes fiók kell (vagy fizetős
+       csomag, ahol egy fiókban több sablon is lehet).
    Minden sablont a SAJÁT fiókja kulcsaival kell használni — egy sablon
    csak abban a fiókban küldhető, amelyikben létrehoztad!
 
@@ -81,8 +84,25 @@ LÉPÉSEK
        offerPublicKey:   'VW5KUMRIxcbu5f_h9',   // Fiók B public key
        offerServiceId:   'service_zwzr5l9',     // Fiók B service
        templateOffer:    'template_ajanlat',    // Fiók B sablon
-       templateContract: 'template_szerzodes'   // Fiók B sablon
+       templateContract: 'template_szerzodes',  // Fiók B sablon
+       // Fiók C (app: SZÁMLA e-mail) — töltsd ki egy ÚJ fiók adataival
+       invoicePublicKey: 'EMAILJS_INVOICE_PUBLIC',   // Fiók C public key
+       invoiceServiceId: 'EMAILJS_INVOICE_SERVICE',  // Fiók C service
+       templateInvoice:  'template_szamla'      // Fiók C sablon
      };
+
+   SZÁMLA E-MAIL BEÁLLÍTÁSA (Fiók C):
+     1. Hozz létre egy ÚJ EmailJS-fiókot (ingyenes), köss hozzá egy email
+        service-t → kimásolod: invoiceServiceId + invoicePublicKey.
+     2. Új template a "email-sablonok/email-sablon-szamla.html" tartalmával.
+        Settings: To Email = {{to_email}}, From Name = {{from_name}},
+        Reply To = {{reply_to}}, Subject = {{subject}}.
+        A sablon változói: {{from_name}} {{brand_initial}} {{tagline}}
+        {{heading}} {{intro}} {{{details}}}  (a details HÁROM kapcsos!).
+     3. A template ID-t írd a templateInvoice mezőbe (template_szamla),
+        a fiók kulcsait az invoicePublicKey / invoiceServiceId mezőbe.
+     Amíg ezek placeholderek (EMAILJS_...), a "✉ E-mail" gomb szól, hogy
+     nincs beállítva, és nem küld.
 
    Ezek publikus azonosítók (nem titkosak) — az EmailJS böngészős
    használatában mindegyik látható, ez normális. A PRIVÁTKULCSOKAT SOHA

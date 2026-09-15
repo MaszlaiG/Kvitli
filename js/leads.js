@@ -673,6 +673,10 @@ window.showTab = function (id) {
     if (typeof closeOrderDetail === 'function') closeOrderDetail();
     if (typeof renderOrders === 'function') renderOrders();
   }
+  if (id === 'invoices') {
+    if (typeof closeInvoiceGroup === 'function') closeInvoiceGroup();
+    else if (typeof renderInvoices === 'function') renderInvoices();
+  }
 };
 document.addEventListener('swm:ready', () => {
   const dEl = document.getElementById('ld-date');
